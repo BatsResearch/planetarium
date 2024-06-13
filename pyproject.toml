@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "planetarium"
+version = "0.1.0"
+description = "Benchmark framework for evaluating LLMs performance in the context of PDDL code generation."
+authors = [
+  "Max Zuo <maxzuo@brown.edu>",
+  "Francisco J. Piedrahita-Velez <fpiedrah@brown.edu>",
+]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+networkx = "^3.2.1"
+pddl = {git = "https://github.com/maxzuo/pddl.git"}
+numpy = "^1.26.2"
+scipy = "^1.11.4"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.1.7"
+pytest = "^7.4.3"
+mypy = "^1.7.1"
+black = {extras = ["jupyter"], version = "^23.11.0"}
+pytest-cov = "^4.1.0"
+pytest-timeout = "^2.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+allow_redefinition = true
+ignore_missing_imports = true

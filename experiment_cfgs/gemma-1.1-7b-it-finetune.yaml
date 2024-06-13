@@ -1,0 +1,50 @@
+dataset:
+  database_path: dataset.db
+  splits_path: splits.yaml
+  splits:
+    train:
+      - [blocksworld, random, "0"]
+      - [gripper, random, "0"]
+      - [blocksworld, random, "1"]
+      - [gripper, random, "1"]
+      - [blocksworld, random, "2"]
+      - [gripper, random, "2"]
+      - [blocksworld, random, "3"]
+      - [gripper, random, "3"]
+    test:
+      - [blocksworld, random, "4"]
+      - [gripper, random, "4"]
+  prompts:
+    problem: "Provide me with the complete, valid problem PDDL file that \
+      describes the following planning problem directly without further \
+      explanations or texts."
+    domain: "The domain for the planning problem is:"
+train:
+  lora_config:
+    r: 16
+    lora_alpha: 32
+    lora_dropout: 0.05
+    bias: none
+    task_type: CAUSAL_LM
+  bnb_config:
+    bits: 4
+    double_quant: True
+    quant_type: nf4
+  training_args:
+    output_dir: /oscar/scratch/mzuo6/gemma-logs/
+    evaluation_strategy: epoch
+    learning_rate: .00002
+    num_train_epochs: 1
+    per_device_train_batch_size: 1
+    per_device_eval_batch_size: 1
+    weight_decay: 0.01
+    report_to: wandb
+    bf16: True
+    bf16_full_eval: True
+  save_path: gemma-1.1-7b-it-random/
+  model:
+    type: hf
+    tokenizer_name: google/gemma-1.1-7b-it
+    model_name: google/gemma-1.1-7b-it
+    response_template: "<start_of_turn>model\n"
+    max_seq_length: 1500

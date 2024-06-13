@@ -1,0 +1,23 @@
+dataset:
+  database_path: dataset.db
+  splits_path: splits.yaml
+  splits:
+    test:
+      - [blocksworld, random, "4"]
+      - [gripper, random, "4"]
+  prompts:
+    problem: "Provide me with the complete, valid problem PDDL file that \
+      describes the following planning problem directly without further \
+      explanations or texts."
+    domain: "The domain for the planning problem is:"
+evaluate:
+  splits:
+    - test
+  batch_size: 64
+  model:
+    type: hf
+    tokenizer_name: google/gemma-1.1-7b-it
+    model_name: google/gemma-1.1-7b-it
+    response_template: "<start_of_turn>model\n"
+    kwargs:
+      attn_implementation: flash_attention_2
