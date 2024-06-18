@@ -27,22 +27,21 @@ def apply_template(
     Returns:
         list[dict[str, str]]: Problem prompt.
     """
-    return (
+    return [
+        {
+            "role": "user",
+            "content": f"{problem_prompt} {problem.natural_language} "
+            + f"{domain_prompt}\n{problem.domain}\n",
+        },
+    ] + (
         [
-            {
-                "role": "user",
-                "content": f"{problem_prompt} {problem.natural_language} "
-                + f"{domain_prompt}\n{problem.domain}\n",
-            },
-        ]
-        + ([
             {
                 "role": "assistant",
                 "content": " " + problem.problem,
             },
         ]
         if include_answer
-        else [])
+        else []
     )
 
 
@@ -70,19 +69,7 @@ def plot(graph: graph.SceneGraph, already_reduced: bool = False):
 
     fig = plt.figure()
 
-    nx.draw_networkx_nodes(graph, pos, ax=fig.gca())
-    nx.draw_networkx_labels(graph, pos, ax=fig.gca())
-
-    from collections import Counter
-    edge_counts = Counter(map(str, graph.edges()))
-
-    curved_edges = [edge for edge in graph.edges() if edge_counts[str(edge)] > 1]
-    straight_edges = list(set(graph.edges()) - set(curved_edges))
-
-    arc_rad = 0.25
-    print(edge_counts)
-    nx.draw_networkx_edges(graph, pos, ax=fig.gca(), edgelist=straight_edges)
-    nx.draw_networkx_edges(graph, pos, ax=fig.gca(), edgelist=curved_edges, connectionstyle=f'arc3, rad = {arc_rad}')
+    nx.draw(graph, pos=pos, ax=fig.gca(), with_labels=True)
 
     return fig
 
@@ -100,7 +87,7 @@ def load_dataset(config: dict) -> dict[str, Dataset]:
         split_ids_cfg = yaml.safe_load(f)
 
     splits: set[str] = config.get("splits", {}).keys()
-    dataset = {split: defaultdict(list) for split in splits}
+    dataset: dict[str, dict[str, list]] = {split: defaultdict(list) for split in splits}
 
     # Connect to database
     conn = sqlite3.connect(config["database_path"])

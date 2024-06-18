@@ -1,5 +1,3 @@
-from typing import Generator
-
 from collections import defaultdict
 import copy
 import enum

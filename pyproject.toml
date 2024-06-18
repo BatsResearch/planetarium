@@ -3,7 +3,7 @@ name = "planetarium"
 version = "0.1.0"
 description = "Benchmark framework for evaluating LLMs performance in the context of PDDL code generation."
 authors = [
-  "Max Zuo <maxzuo@brown.edu>",
+  "Max Zuo <zuo@brown.edu>",
   "Francisco J. Piedrahita-Velez <fpiedrah@brown.edu>",
 ]
 readme = "README.md"
@@ -14,6 +14,16 @@ networkx = "^3.2.1"
 pddl = {git = "https://github.com/maxzuo/pddl.git"}
 numpy = "^1.26.2"
 scipy = "^1.11.4"
+vllm = "^0.5.0.post1"
+matplotlib = "^3.9.0"
+python-dotenv = "^1.0.1"
+pyyaml = "^6.0.1"
+jinja2 = "^3.1.4"
+lark = "^1.1.9"
+datasets = "^2.20.0"
+peft = "^0.11.1"
+trl = "^0.9.4"
+bitsandbytes = "^0.43.1"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -202,7 +202,11 @@ class TestMetrics:
         problem_graph2 = pddl.build(two_initial_problem_string)
 
         assert metric.equals(problem_graph, problem_graph, is_placeholder=True)
-        assert not metric.equals(problem_graph, problem_graph2, is_placeholder=True,)
+        assert not metric.equals(
+            problem_graph,
+            problem_graph2,
+            is_placeholder=True,
+        )
 
     def test_distance_isomorphic(self, problem_string, renamed_problem_string):
         """

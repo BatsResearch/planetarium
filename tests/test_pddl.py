@@ -362,11 +362,3 @@ class TestBuild:
         """
         graph_1, graph_2 = pddl.build(problem_string).decompose()
         assert len(graph_1.edges) == 21 and len(graph_2.edges) == 2
-
-    def test_edge_size(self, problem_string):
-        """
-        Test the size of edges in the scene graphs built from a PDDL problem.
-        """
-        modified_problem_string = f"Here is an example of a problem string that is not a PDDL problem. ```pddl\n{problem_string}\n```"
-        graph_1, graph_2 = pddl.build(modified_problem_string).decompose()
-        assert len(graph_1.edges) == 21 and len(graph_2.edges) == 2

@@ -1,11 +1,12 @@
+from typing import Any, Callable
+
 import functools
 import networkx as nx
 import time
-import typing
 
 from planetarium.graph import Label, SceneGraph, ProblemGraph
 
-Node = dict[str, typing.Any]
+Node = dict[str, Any]
 
 
 def _preserves_mapping(source: Node, target: Node, mapping: dict) -> bool:
@@ -45,14 +46,14 @@ def _same_typing(source: Node, target: Node) -> bool:
     )
 
 
-def _matching(source: Node, target: Node, mapping: typing.Optional[dict]) -> bool:
+def _matching(source: Node, target: Node, mapping: dict | None) -> bool:
     """
     Check if two nodes match based on their labels, positions, and typings.
 
     Parameters:
         source (Node): The source node.
         target (Node): The target node.
-        mapping (Optional[dict]): The mapping between node names.
+        mapping (dict | None): The mapping between node names.
 
     Returns:
         bool: True if nodes match, False otherwise.
@@ -72,7 +73,7 @@ def _matching(source: Node, target: Node, mapping: typing.Optional[dict]) -> boo
 def _map(
     source: SceneGraph,
     target: SceneGraph,
-    mapping: typing.Optional[dict] = None,
+    mapping: dict | None = None,
 ) -> list[dict]:
     """
     Find all valid isomorphic mappings between nodes of two scene graphs.
@@ -80,7 +81,7 @@ def _map(
     Parameters:
         source (SceneGraph): The source scene graph.
         target (SceneGraph): The target scene graph.
-        mapping (Optional[dict]): The initial mapping between node names.
+        mapping (dict | None): The initial mapping between node names.
 
     Returns:
         list: A list of dictionaries representing valid mappings.
@@ -107,7 +108,7 @@ def _map(
 
 
 def _distance(
-    source: SceneGraph, target: SceneGraph, mapping: typing.Optional[dict] = None
+    source: SceneGraph, target: SceneGraph, mapping: dict | None = None
 ) -> int:
     """
     Calculate the graph edit distance between two scene graphs.
@@ -115,7 +116,7 @@ def _distance(
     Parameters:
         source (SceneGraph): The source scene graph.
         target (SceneGraph): The target scene graph.
-        mapping (Optional[dict]): The initial mapping between node names.
+        mapping (dict | None): The initial mapping between node names.
 
     Returns:
         int: The graph edit distance.
@@ -137,7 +138,7 @@ def _minimal_mappings(
     source: SceneGraph,
     target: SceneGraph,
     timeout: float | None = None,
-) -> typing.Tuple[list, int]:
+) -> tuple[list, float, bool]:
     """
     Calculate the graph edit distance between two scene graphs.
 
@@ -149,8 +150,8 @@ def _minimal_mappings(
 
     Returns:
         tuple:
-            - list: A list of dictionaries representing valid mappings.
-            - int: The graph edit distance.
+            - list: A list of list of tuples representing valid mappings.
+            - float: The graph edit distance.
             - bool: True if the timeout was reached, False otherwise.
     """
 
@@ -180,7 +181,7 @@ def _minimal_mappings(
         timeout=timeout,
     )
 
-    paths = []
+    paths: list[Any] = []
     bestcost = float("inf")
     for vertex_path, _, cost in edit_path_gen:
         if bestcost != float("inf") and cost < bestcost:
@@ -197,22 +198,23 @@ def _minimal_mappings(
 def map(
     source: ProblemGraph | SceneGraph,
     target: ProblemGraph | SceneGraph,
-    mapping: typing.Optional[dict] = None,
+    mapping: dict | None = None,
     return_mappings: bool = False,
-) -> list[dict]:
+) -> list[dict] | bool:
     """
     Find all valid isomorphic mappings between nodes of two scene graphs.
 
     Parameters:
         source (ProblemGraph): The source problem graph.
         target (ProblemGraph): The target problem graph.
-        mapping (Optional[dict]): The initial mapping between node names.
+        mapping (dict | None): The initial mapping between node names.
         return_mappings (bool): If True, the function will return a list of
             dictionaries representing valid mappings. If False, the function
             will return a boolean indicating if there is a valid mapping.
 
     Returns:
-        list: A list of dictionaries representing valid mappings.
+        list | bool: A list of dictionaries representing valid mappings or a
+            boolean indicating if there is a valid mapping.
     """
     if not nx.faster_could_be_isomorphic(source, target):
         return [] if return_mappings else False
@@ -227,7 +229,6 @@ def map(
             default=["", -1, ""],
         ),
     )
-    # print('mapping', isinstance(source, ProblemGraph), source.__class__)
 
     if return_mappings:
         return list(mapper.isomorphisms_iter()) if mapper.is_isomorphic() else []
@@ -255,7 +256,7 @@ def equals(
         bool: True if there is a valid mapping, False otherwise.
     """
     if not is_placeholder:
-        return nx.utils.graphs_equal(source, target) or map(source, target)
+        return nx.utils.graphs_equal(source, target) or bool(map(source, target))
     else:
         source_init, source_goal = source.decompose()
         target_init, target_goal = target.decompose()
@@ -269,8 +270,8 @@ def equals(
         ):
             return True
 
-        valid_init = map(source_init, target_init)
-        valid_goal = map(source_goal, target_goal)
+        valid_init = bool(map(source_init, target_init))
+        valid_goal = bool(map(source_goal, target_goal))
 
         return valid_init and valid_goal
 
@@ -281,7 +282,7 @@ def distance(
     goal_source: SceneGraph,
     goal_target: SceneGraph,
     timeout: float | None = None,
-) -> tuple[float, float]:
+) -> tuple[float, bool, float, bool]:
     """
     Calculate the graph edit distance between initial and goal scene graphs.
 
@@ -290,7 +291,7 @@ def distance(
         initial_target (SceneGraph): The initial target scene graph.
         goal_source (SceneGraph): The goal source scene graph.
         goal_target (SceneGraph): The goal target scene graph.
-        timeout (Optional[float]): The maximum number of seconds to spend.
+        timeout (float | None): The maximum number of seconds to spend.
 
     Returns:
         tuple:
@@ -307,7 +308,7 @@ def distance(
     def timed_out() -> bool:
         return bool(timeout and time.perf_counter() - start_time > timeout)
 
-    def mapping_to_fn(mapping: list) -> typing.Callable[[typing.Any], bool]:
+    def mapping_to_fn(mapping: list) -> Callable[[dict, dict], bool]:
         """
         Convert a mapping to a matching function.
 
