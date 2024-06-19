@@ -2,8 +2,6 @@ import pytest
 
 from planetarium import graph, oracle, pddl
 
-import networkx as nx
-
 
 @pytest.fixture
 def blocksworld_fully_specified():
@@ -851,7 +849,7 @@ def gripper_missing_typing():
     """
 
 
-def reduce_and_respecify(scene: graph.SceneGraph) -> bool:
+def reduce_and_inflate(scene: graph.SceneGraph) -> bool:
     """Respecify a scene and check if it is equal to the original.
 
     Args:
@@ -862,7 +860,7 @@ def reduce_and_respecify(scene: graph.SceneGraph) -> bool:
     """
     reduced = oracle.reduce(scene, domain=scene.domain)
     respecified = oracle.inflate(reduced, domain=scene.domain)
-    return nx.utils.graphs_equal(scene, respecified)
+    return scene == respecified
 
 
 class TestBlocksworldOracle:
@@ -944,7 +942,7 @@ class TestBlocksworldOracle:
             is_placeholder=False,
         )
 
-    def test_respecify(
+    def test_inflate(
         self,
         blocksworld_fully_specified,
         blocksworld_missing_clears,
@@ -954,7 +952,7 @@ class TestBlocksworldOracle:
         blocksworld_holding,
     ):
         """
-        Test the respecify function.
+        Test the inflate function.
         """
 
         descs = [
@@ -968,8 +966,8 @@ class TestBlocksworldOracle:
 
         for desc in descs:
             init, goal = pddl.build(desc).decompose()
-            assert reduce_and_respecify(init)
-            assert reduce_and_respecify(goal)
+            assert reduce_and_inflate(init)
+            assert reduce_and_inflate(goal)
 
     def test_invalid(
         self,
@@ -1021,14 +1019,14 @@ class TestGripperOracle:
         )
         assert not oracle.is_fully_specified(problem, is_placeholder=False)
 
-    def test_respecify(self, gripper_fully_specified):
+    def test_inflate(self, gripper_fully_specified):
         """
-        Test the respecify function.
+        Test the inflate function.
         """
 
         init, goal = pddl.build(gripper_fully_specified).decompose()
-        assert reduce_and_respecify(init)
-        assert reduce_and_respecify(goal)
+        assert reduce_and_inflate(init)
+        assert reduce_and_inflate(goal)
 
     def test_underspecified(
         self,
@@ -1051,7 +1049,7 @@ class TestGripperOracle:
 
 
 class TestUnsupportedDomain:
-    def test_reduce_and_respecify(self, gripper_fully_specified):
+    def test_reduce_and_inflate(self, gripper_fully_specified):
         problem = pddl.build(gripper_fully_specified)
         init, goal = problem.decompose()
 

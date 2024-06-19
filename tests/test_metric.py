@@ -39,32 +39,44 @@ class TestConstantMatching:
     @pytest.fixture
     def source(self):
         """Fixture for a valid source constant."""
-        return {"name": "o1", "typing": ["t1", "t2"], "label": graph.Label.CONSTANT}
+        return graph.PlanGraphNode(
+            "o1", "o1", typing=["t1", "t2"], label=graph.Label.CONSTANT
+        )
 
     @pytest.fixture
     def target(self):
         """Fixture for a valid target constant."""
-        return {"name": "c1", "typing": ["t1", "t2"], "label": graph.Label.CONSTANT}
+        return graph.PlanGraphNode(
+            "c1", "c1", typing=["t1", "t2"], label=graph.Label.CONSTANT
+        )
 
     @pytest.fixture
     def source_incorrect_label(self):
         """Fixture for a source constant with an incorrect label."""
-        return {"name": "o1", "typing": ["t1", "t2"], "label": graph.Label.PREDICATE}
+        return graph.PlanGraphNode(
+            "o1", "o1", typing=["t1", "t2"], label=graph.Label.PREDICATE
+        )
 
     @pytest.fixture
     def target_incorrect_label(self):
         """Fixture for a target constant with an incorrect label."""
-        return {"name": "c1", "typing": ["t1", "t2"], "label": graph.Label.PREDICATE}
+        return graph.PlanGraphNode(
+            "c1", "c1", typing=["t1", "t2"], label=graph.Label.PREDICATE
+        )
 
     @pytest.fixture
     def source_incorrect_typing(self):
         """Fixture for a source constant with incorrect typing."""
-        return {"name": "o1", "typing": ["ty1", "ty2"], "label": graph.Label.CONSTANT}
+        return graph.PlanGraphNode(
+            "o1", "o1", typing=["ty1", "ty2"], label=graph.Label.CONSTANT
+        )
 
     @pytest.fixture
     def target_incorrect_typing(self):
         """Fixture for a target constant with incorrect typing."""
-        return {"name": "c1", "typing": ["ty1", "ty2"], "label": graph.Label.CONSTANT}
+        return graph.PlanGraphNode(
+            "c1", "c1", typing=["ty1", "ty2"], label=graph.Label.CONSTANT
+        )
 
     @pytest.fixture
     def mapping(self):
@@ -78,8 +90,8 @@ class TestConstantMatching:
 
     def test_correct_matching(self, source, target, mapping):
         """Test correct matching between source and target constants."""
-        assert metric._matching(source, target, None)
-        assert metric._matching(source, target, mapping)
+        assert metric._node_matching(source, target, None)
+        assert metric._node_matching(source, target, mapping)
 
         assert metric._same_typing(source, target)
         assert metric._preserves_mapping(source, target, mapping)
@@ -88,10 +100,10 @@ class TestConstantMatching:
         self, source, target, source_incorrect_label, target_incorrect_label, mapping
     ):
         """Test incorrect label matching between source and target constants."""
-        assert not metric._matching(source, target_incorrect_label, None)
-        assert not metric._matching(source_incorrect_label, target, None)
-        assert not metric._matching(source, target_incorrect_label, mapping)
-        assert not metric._matching(source_incorrect_label, target, mapping)
+        assert not metric._node_matching(source, target_incorrect_label, None)
+        assert not metric._node_matching(source_incorrect_label, target, None)
+        assert not metric._node_matching(source, target_incorrect_label, mapping)
+        assert not metric._node_matching(source_incorrect_label, target, mapping)
 
         assert not metric._preserves_mapping(source, target_incorrect_label, mapping)
         assert not metric._preserves_mapping(source_incorrect_label, target, mapping)
@@ -103,10 +115,10 @@ class TestConstantMatching:
         self, source, target, source_incorrect_typing, target_incorrect_typing, mapping
     ):
         """Test incorrect typing between source and target constants."""
-        assert not metric._matching(source, target_incorrect_typing, None)
-        assert not metric._matching(source_incorrect_typing, target, None)
-        assert not metric._matching(source, target_incorrect_typing, mapping)
-        assert not metric._matching(source_incorrect_typing, target, mapping)
+        assert not metric._node_matching(source, target_incorrect_typing, None)
+        assert not metric._node_matching(source_incorrect_typing, target, None)
+        assert not metric._node_matching(source, target_incorrect_typing, mapping)
+        assert not metric._node_matching(source_incorrect_typing, target, mapping)
 
         assert metric._preserves_mapping(source, target_incorrect_typing, mapping)
         assert metric._preserves_mapping(source_incorrect_typing, target, mapping)
@@ -116,7 +128,7 @@ class TestConstantMatching:
 
     def test_incorrect_mapping(self, source, target, mapping_incorrect):
         """Test incorrect mapping between source and target constants."""
-        assert not metric._matching(source, target, mapping_incorrect)
+        assert not metric._node_matching(source, target, mapping_incorrect)
         assert not metric._preserves_mapping(source, target, mapping_incorrect)
 
 
@@ -128,42 +140,46 @@ class TestPredicateMatching:
     @pytest.fixture
     def source(self):
         """Fixture for a valid source predicate node."""
-        return {
-            "name": "f-a1-a2",
-            "typing": "f",
-            "label": graph.Label.PREDICATE,
-        }
+        return graph.PlanGraphNode(
+            "f-a1-a2",
+            "f-a1-a2",
+            typing="f",
+            label=graph.Label.PREDICATE,
+        )
 
     @pytest.fixture
     def target(self):
         """Fixture for a valid target predicate node."""
-        return {
-            "name": "f-a1-a2",
-            "typing": "f",
-            "label": graph.Label.PREDICATE,
-        }
+        return graph.PlanGraphNode(
+            "f-a1-a2",
+            "f-a1-a2",
+            typing="f",
+            label=graph.Label.PREDICATE,
+        )
 
     @pytest.fixture
     def source_incorrect_label(self):
         """Fixture for a source predicate node with an incorrect label."""
-        return {
-            "name": "f-a1-a2",
-            "typing": "f",
-            "label": graph.Label.CONSTANT,
-        }
+        return graph.PlanGraphNode(
+            "f-a1-a2",
+            "f-a1-a2",
+            typing="f",
+            label=graph.Label.CONSTANT,
+        )
 
     @pytest.fixture
     def target_incorrect_label(self):
         """Fixture for a target predicate node with an incorrect label."""
-        return {
-            "name": "f-a1-a2",
-            "typing": "f",
-            "label": graph.Label.CONSTANT,
-        }
+        return graph.PlanGraphNode(
+            "f-a1-a2",
+            "f-a1-a2",
+            typing="f",
+            label=graph.Label.CONSTANT,
+        )
 
     def test_correct_matching(self, source, target):
         """Test correct matching between source and target predicate nodes."""
-        assert metric._matching(source, target, None)
+        assert metric._node_matching(source, target, None)
 
     def test_incorrect_label(
         self,
@@ -173,8 +189,8 @@ class TestPredicateMatching:
         target_incorrect_label,
     ):
         """Test incorrect label matching between source and target predicate nodes."""
-        assert not metric._matching(source, target_incorrect_label, None)
-        assert not metric._matching(source_incorrect_label, target, None)
+        assert not metric._node_matching(source, target_incorrect_label, None)
+        assert not metric._node_matching(source_incorrect_label, target, None)
 
 
 class TestMetrics:
@@ -189,12 +205,8 @@ class TestMetrics:
 
         initial, goal = problem_graph.decompose()
 
-        assert metric._map(initial, initial) != []
-        assert metric._map(goal, goal) != []
-        assert metric._map(initial, goal) == []
-
-        assert metric.map(problem_graph, problem_graph, return_mappings=True) != []
-        assert metric.map(problem_graph, problem_graph2, return_mappings=True) == []
+        assert metric.isomorphic(problem_graph, problem_graph)
+        assert not metric.isomorphic(problem_graph, problem_graph2)
 
     def test_validate(self, problem_string, two_initial_problem_string):
         """Test the validation function on graph pairs."""
@@ -202,110 +214,34 @@ class TestMetrics:
         problem_graph2 = pddl.build(two_initial_problem_string)
 
         assert metric.equals(problem_graph, problem_graph, is_placeholder=True)
-        assert not metric.equals(problem_graph, problem_graph2, is_placeholder=True,)
-
-    def test_distance_isomorphic(self, problem_string, renamed_problem_string):
-        """
-        Test the distance function on graph pairs, considering only isomorphic cases.
-        """
-        initial, goal = pddl.build(problem_string).decompose()
-        initial2, goal2 = pddl.build(renamed_problem_string).decompose()
-
-        # Limiting the test to isomorphic cases to optimize execution time.
-        assert metric._distance(initial, initial) == 0.0
-        assert metric.distance(
-            initial,
-            initial2,
-            goal,
-            goal2,
-            timeout=15.0,
-        ) == (0.0, False, 0.0, False)
-
-    def test_distance(self, problem_string, wrong_problem_string):
-        """
-        Test the distance function on graph pairs.
-        """
-        initial, goal = pddl.build(problem_string).decompose()
-        initial2, goal2 = pddl.build(wrong_problem_string).decompose()
-
-        assert metric._distance(initial, initial) == 0.0
-        assert metric.distance(initial, initial2, goal, goal2) == (
-            0.0,
-            False,
-            2.0,
-            False,
+        assert not metric.equals(
+            problem_graph,
+            problem_graph2,
+            is_placeholder=True,
         )
-
-    def test_wrong_initial_scene(
-        self,
-        problem_string,
-        wrong_initial_problem_string,
-    ):
-        """
-        Test the distance function on graph pairs.
-        """
-        initial, goal = pddl.build(problem_string).decompose()
-        initial2, goal2 = pddl.build(wrong_initial_problem_string).decompose()
-
-        # This function should timeout, so the value will be an approximation
-        assert metric._distance(initial, initial) == 0.0
-
-        init_distance, approx_init, _, _ = metric.distance(
-            initial,
-            initial2,
-            goal,
-            goal2,
-            timeout=2.0,
-        )
-
-        assert init_distance < 25.0
-        assert approx_init
 
     def test_swap(self, swap_problem_string, wrong_swap_problem_string):
         """
         Test the distance function on graph pairs.
         """
         swap_problem = pddl.build(swap_problem_string)
-        initial, goal = swap_problem.decompose()
         wrong_swap = pddl.build(wrong_swap_problem_string)
-        initial2, goal2 = wrong_swap.decompose()
 
         # Test validate
         assert metric.equals(swap_problem, swap_problem, is_placeholder=False)
         assert not metric.equals(swap_problem, wrong_swap, is_placeholder=False)
         assert metric.equals(swap_problem, wrong_swap, is_placeholder=True)
 
-        assert metric._distance(initial, initial) == 0.0
-        assert metric.distance(
-            initial,
-            initial2,
-            goal,
-            goal2,
-            timeout=15.0,
-        ) == (0.0, False, 2.0, False)
-
     def test_move(self, move_problem_string, wrong_move_problem_string):
         """
         Test the distance function on graph pairs.
         """
         move_problem = pddl.build(move_problem_string)
-        initial, goal = move_problem.decompose()
         wrong_move = pddl.build(wrong_move_problem_string)
-        initial2, goal2 = wrong_move.decompose()
 
         # Test validate
         assert metric.equals(move_problem, move_problem, is_placeholder=True)
         assert not metric.equals(move_problem, wrong_move, is_placeholder=True)
-
-        # Limiting the test to isomorphic cases to optimize execution time.
-        assert metric._distance(initial, initial) == 0.0
-        assert metric.distance(
-            initial,
-            initial2,
-            goal,
-            goal2,
-            timeout=15.0,
-        ) == (2.0, False, 0.0, False)
 
     def test_blocksworld_equivalence(
         self,
