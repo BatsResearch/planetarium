@@ -1,6 +1,6 @@
 import pytest
 
-from planetarium import pddl
+from planetarium import builder
 
 from pddl.parser.problem import LenientProblemParser
 
@@ -257,6 +257,47 @@ def wrong_move_problem_string():
 
 
 @pytest.fixture
+def single_predicate_goal():
+    """
+    Fixture providing a sample PDDL problem definition as a string.
+    """
+    return """
+        (define (problem move)
+          (:domain move)
+          (:objects a0 a1 - object
+                    b0 b1 - room)
+
+          (:init
+            (in a0 b0)
+            (in a1 b1))
+
+          (:goal (in a0 b0))
+        )
+    """
+
+
+@pytest.fixture
+def not_predicate_goal():
+    """
+    Fixture providing a sample PDDL problem definition as a string.
+    """
+    return """
+        (define (problem move)
+          (:domain move)
+          (:objects a0 a1 - object
+                    b0 b1 - room)
+
+          (:init
+            (in a0 b0)
+            (in a1 b1))
+
+          (:goal (not
+            (in a0 b0)))
+        )
+    """
+
+
+@pytest.fixture
 def problem(problem_string):
     """
     Fixture providing a parsed PDDL problem object.
@@ -274,14 +315,14 @@ class TestConstantToDict:
         Test the conversion of a PDDL Constant to a dictionary with the correct name.
         """
         constant = list(problem.objects)[0]
-        assert pddl._constant_to_dict(constant)["name"] == str(constant.name)
+        assert builder._constant_to_dict(constant)["name"] == str(constant.name)
 
     def test_constat_type(self, problem):
         """
         Test the conversion of a PDDL Constant to a dictionary with the correct typing.
         """
         constant = list(problem.objects)[0]
-        result_dict = pddl._constant_to_dict(constant)
+        result_dict = builder._constant_to_dict(constant)
         assert (
             result_dict["typing"] == constant.type_tags
             and type(result_dict["typing"]) == set
@@ -298,14 +339,14 @@ class TestPredicateToDict:
         Test the conversion of a PDDL Predicate to a dictionary with the correct name.
         """
         predicate = list(problem.init)[0]
-        assert pddl._predicate_to_dict(predicate)["typing"] == str(predicate.name)
+        assert builder._predicate_to_dict(predicate)["typing"] == str(predicate.name)
 
     def test_predicate_parameters(self, problem):
         """
         Test the conversion of a PDDL Predicate to a dictionary with the correct parameters.
         """
         predicate = list(problem.init)[0]
-        result_dict = pddl._predicate_to_dict(predicate)
+        result_dict = builder._predicate_to_dict(predicate)
         assert (
             result_dict["parameters"] == [term.name for term in predicate.terms]
             and type(result_dict["parameters"]) == list
@@ -321,7 +362,7 @@ class TestBuildConstants:
         """
         Test the size of the list of constants built from a PDDL problem.
         """
-        assert len(pddl._build_constants(problem.objects)) == len(problem.objects)
+        assert len(builder._build_constants(problem.objects)) == len(problem.objects)
 
 
 class TestBuildPredicates:
@@ -333,13 +374,13 @@ class TestBuildPredicates:
         """
         Test the size of the list of initial predicates built from a PDDL problem.
         """
-        assert len(pddl._build_predicates(problem.init)) == len(problem.init)
+        assert len(builder._build_predicates(problem.init)) == len(problem.init)
 
     def test_goal_size(self, problem):
         """
         Test the size of the list of goal predicates built from a PDDL problem.
         """
-        assert len(pddl._build_predicates(problem.goal.operands)) == len(
+        assert len(builder._build_predicates(problem.goal.operands)) == len(
             problem.goal.operands
         )
 
@@ -353,12 +394,33 @@ class TestBuild:
         """
         Test the size of nodes in the scene graphs built from a PDDL problem.
         """
-        graph_1, graph_2 = pddl.build(problem_string).decompose()
+        graph_1, graph_2 = builder.build(problem_string).decompose()
         assert len(graph_1.nodes) == 17 and len(graph_2.nodes) == 8
 
     def test_edge_size(self, problem_string):
         """
         Test the size of edges in the scene graphs built from a PDDL problem.
         """
-        graph_1, graph_2 = pddl.build(problem_string).decompose()
+        graph_1, graph_2 = builder.build(problem_string).decompose()
         assert len(graph_1.edges) == 21 and len(graph_2.edges) == 2
+
+    def test_edge_size(self, problem_string):
+        """
+        Test the size of edges in the scene graphs built from a PDDL problem.
+        """
+        modified_problem_string = f"Here is an example of a problem string that is not a PDDL problem. ```pddl\n{problem_string}\n```"
+        graph_1, graph_2 = builder.build(modified_problem_string).decompose()
+        assert len(graph_1.edges) == 21 and len(graph_2.edges) == 2
+
+    def test_single_predicate_goal(self, single_predicate_goal):
+        """
+        Test the size of nodes in the scene graphs built from a PDDL problem.
+        """
+        builder.build(single_predicate_goal).decompose()
+
+    def test_not_predicate_goal(self, not_predicate_goal):
+        """
+        Test the size of nodes in the scene graphs built from a PDDL problem.
+        """
+        with pytest.raises(ValueError):
+            builder.build(not_predicate_goal).decompose()

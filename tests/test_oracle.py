@@ -1,8 +1,6 @@
 import pytest
 
-from planetarium import graph, oracle, pddl
-
-import networkx as nx
+from planetarium import builder, graph, oracle
 
 
 @pytest.fixture
@@ -851,7 +849,7 @@ def gripper_missing_typing():
     """
 
 
-def reduce_and_respecify(scene: graph.SceneGraph) -> bool:
+def reduce_and_inflate(scene: graph.SceneGraph) -> bool:
     """Respecify a scene and check if it is equal to the original.
 
     Args:
@@ -862,7 +860,7 @@ def reduce_and_respecify(scene: graph.SceneGraph) -> bool:
     """
     reduced = oracle.reduce(scene, domain=scene.domain)
     respecified = oracle.inflate(reduced, domain=scene.domain)
-    return nx.utils.graphs_equal(scene, respecified)
+    return scene == respecified
 
 
 class TestBlocksworldOracle:
@@ -874,77 +872,35 @@ class TestBlocksworldOracle:
         """
         Test the fully specified blocksworld problem.
         """
-        problem = pddl.build(blocksworld_fully_specified)
-        assert oracle.is_fully_specified(problem, is_placeholder=True)
-
-        assert oracle.is_fully_specified(
-            oracle.fully_specify(problem),
-            domain="blocksworld",
-            is_placeholder=True,
-        )
+        problem = builder.build(blocksworld_fully_specified)
+        full = oracle.fully_specify(problem)
+        assert oracle.fully_specify(full) == full
 
     def test_missing_clears(self, blocksworld_missing_clears):
         """
         Test the fully specified blocksworld problem with missing clears.
         """
-        problem = pddl.build(blocksworld_missing_clears)
-        assert oracle.is_fully_specified(
-            problem,
-            domain="blocksworld",
-            is_placeholder=True,
-        )
-        assert not oracle.is_fully_specified(
-            problem,
-            domain="blocksworld",
-            is_placeholder=False,
-        )
+        problem = builder.build(blocksworld_missing_clears)
+        full = oracle.fully_specify(problem)
+        assert oracle.fully_specify(full) == full
 
     def test_missing_ontables(self, blocksworld_missing_ontables):
         """
         Test the fully specified blocksworld problem with missing clears.
         """
-        problem = pddl.build(blocksworld_missing_ontables)
-        assert oracle.is_fully_specified(problem, is_placeholder=True)
-        assert not oracle.is_fully_specified(
-            problem,
-            domain="blocksworld",
-            is_placeholder=False,
-        )
-        assert oracle.is_fully_specified(
-            oracle.fully_specify(problem),
-            domain="blocksworld",
-            is_placeholder=True,
-        )
-        assert oracle.is_fully_specified(
-            oracle.fully_specify(problem),
-            domain="blocksworld",
-            is_placeholder=False,
-        )
+        problem = builder.build(blocksworld_missing_ontables)
+        full = oracle.fully_specify(problem)
+        assert oracle.fully_specify(full) == full
 
     def test_missing_ontables_and_clears(self, blocksworld_underspecified):
         """
         Test the fully specified blocksworld problem with missing clears.
         """
-        problem = pddl.build(blocksworld_underspecified)
-        assert not oracle.is_fully_specified(problem, is_placeholder=True)
-        assert not oracle.is_fully_specified(
-            problem,
-            domain="blocksworld",
-            is_placeholder=False,
-        )
+        problem = builder.build(blocksworld_underspecified)
+        full = oracle.fully_specify(problem)
+        assert oracle.fully_specify(full) == full
 
-        assert not oracle.is_fully_specified(
-            oracle.fully_specify(problem),
-            domain="blocksworld",
-            is_placeholder=True,
-        )
-        assert not oracle.is_fully_specified(
-            oracle.fully_specify(problem),
-            domain="blocksworld",
-            is_placeholder=False,
-        )
-
-    def test_respecify(
+    def test_inflate(
         self,
         blocksworld_fully_specified,
         blocksworld_missing_clears,
@@ -954,7 +910,7 @@ class TestBlocksworldOracle:
         blocksworld_holding,
     ):
         """
-        Test the respecify function.
+        Test the inflate function.
         """
 
         descs = [
@@ -967,9 +923,18 @@ class TestBlocksworldOracle:
         ]
 
         for desc in descs:
-            init, goal = pddl.build(desc).decompose()
-            assert reduce_and_respecify(init)
-            assert reduce_and_respecify(goal)
+            problem = builder.build(desc)
+            init, goal = problem.decompose()
+            assert reduce_and_inflate(init)
+            assert reduce_and_inflate(goal)
+            assert reduce_and_inflate(problem)
+
+            assert problem == oracle.inflate(
+                oracle.ReducedProblemGraph.join(
+                    oracle.reduce(init, validate=True),
+                    oracle.reduce(goal, validate=True),
+                )
+            )
 
     def test_invalid(
         self,
@@ -982,9 +947,12 @@ class TestBlocksworldOracle:
             blocksworld_invalid_2,
             blocksworld_invalid_3,
         ):
-            _, goal = pddl.build(desc).decompose()
+            problem = builder.build(desc)
+            _, goal = problem.decompose()
             with pytest.raises(ValueError):
                 oracle.reduce(goal, validate=True)
+            with pytest.raises(ValueError):
+                oracle.reduce(problem, validate=True)
 
 
 class TestGripperOracle:
@@ -1001,58 +969,75 @@ class TestGripperOracle:
         """
         Test the fully specified gripper problem.
         """
-        problem = pddl.build(gripper_fully_specified)
-        assert oracle.is_fully_specified(problem, is_placeholder=True)
-        assert oracle.is_fully_specified(problem, is_placeholder=False)
+        problem = builder.build(gripper_fully_specified)
+        full = oracle.fully_specify(problem)
+        assert oracle.fully_specify(full) == full
 
-        problem = pddl.build(gripper_no_goal_types)
-        assert oracle.is_fully_specified(problem, is_placeholder=True)
-        assert oracle.is_fully_specified(
-            oracle.fully_specify(problem),
-            is_placeholder=True,
-        )
-        assert not oracle.is_fully_specified(problem, is_placeholder=False)
+        problem = builder.build(gripper_no_goal_types)
+        full = oracle.fully_specify(problem)
+        assert oracle.fully_specify(full) == full
 
-        problem = pddl.build(gripper_fully_specified_not_strict)
-        assert oracle.is_fully_specified(problem, is_placeholder=True)
-        assert oracle.is_fully_specified(
-            oracle.fully_specify(problem),
-            is_placeholder=True,
-        )
-        assert not oracle.is_fully_specified(problem, is_placeholder=False)
+        problem = builder.build(gripper_fully_specified_not_strict)
+        full = oracle.fully_specify(problem)
+        assert oracle.fully_specify(full) == full
 
-    def test_respecify(self, gripper_fully_specified):
+    def test_inflate(self, gripper_fully_specified):
         """
-        Test the respecify function.
+        Test the inflate function.
         """
 
-        init, goal = pddl.build(gripper_fully_specified).decompose()
-        assert reduce_and_respecify(init)
-        assert reduce_and_respecify(goal)
+        init, goal = builder.build(gripper_fully_specified).decompose()
+        assert reduce_and_inflate(init)
+        assert reduce_and_inflate(goal)
+
+    def test_reduce_inflate(
+        self,
+        gripper_fully_specified,
+        gripper_no_robby,
+        gripper_underspecified_1,
+        gripper_underspecified_2,
+        gripper_underspecified_3,
+    ):
+        descs = [
+            gripper_fully_specified,
+            gripper_no_robby,
+            gripper_underspecified_1,
+            gripper_underspecified_2,
+            gripper_underspecified_3,
+        ]
+        for desc in descs:
+            problem = builder.build(desc)
+            init, goal = problem.decompose()
+
+            assert reduce_and_inflate(init)
+            assert reduce_and_inflate(goal)
+            assert reduce_and_inflate(problem)
 
     def test_underspecified(
         self,
         gripper_underspecified_1,
         gripper_underspecified_2,
     ):
-        problem = pddl.build(gripper_underspecified_1)
-        assert not oracle.is_fully_specified(problem, is_placeholder=True)
-        assert not oracle.is_fully_specified(problem, is_placeholder=False)
+        problem = builder.build(gripper_underspecified_1)
+        full = oracle.fully_specify(problem)
+        assert oracle.fully_specify(full) == full
 
-        problem = pddl.build(gripper_underspecified_2)
-        assert not oracle.is_fully_specified(problem, is_placeholder=True)
-        assert not oracle.is_fully_specified(problem, is_placeholder=False)
+        problem = builder.build(gripper_underspecified_2)
+        full = oracle.fully_specify(problem)
+        assert oracle.fully_specify(full) == full
 
     def test_invalid(self, gripper_invalid):
-        problem = pddl.build(gripper_invalid)
+        problem = builder.build(gripper_invalid)
         _, goal = problem.decompose()
         with pytest.raises(ValueError):
             oracle.reduce(goal, validate=True)
+        with pytest.raises(ValueError):
+            oracle.reduce(problem, validate=True)
 
 
 class TestUnsupportedDomain:
-    def test_reduce_and_respecify(self, gripper_fully_specified):
-        problem = pddl.build(gripper_fully_specified)
+    def test_reduce_and_inflate(self, gripper_fully_specified):
+        problem = builder.build(gripper_fully_specified)
         init, goal = problem.decompose()
 
         with pytest.raises(ValueError):
@@ -1061,12 +1046,7 @@ class TestUnsupportedDomain:
             reduced = oracle.reduce(goal, domain="gripper")
             oracle.inflate(reduced, domain="gripper-modified")
 
-    def test_fully_specified(self, gripper_fully_specified):
-        problem = pddl.build(gripper_fully_specified)
-        with pytest.raises(ValueError):
-            oracle.is_fully_specified(problem, domain="gripper-modified")
-
     def test_fully_specify(self, gripper_fully_specified):
-        problem = pddl.build(gripper_fully_specified)
+        problem = builder.build(gripper_fully_specified)
         with pytest.raises(ValueError):
             oracle.fully_specify(problem, domain="gripper-modified")

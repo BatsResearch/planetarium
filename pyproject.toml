@@ -24,6 +24,7 @@ datasets = "^2.20.0"
 peft = "^0.11.1"
 trl = "^0.9.4"
 bitsandbytes = "^0.43.1"
+rustworkx = "^0.14.2"
 
 
 [tool.poetry.group.dev.dependencies]

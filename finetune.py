@@ -1,5 +1,7 @@
+from collections import defaultdict
 from functools import partial
 import os
+import sqlite3
 import yaml
 
 import dotenv
@@ -10,6 +12,7 @@ import torch
 from torch import nn
 
 import bitsandbytes as bnb
+from datasets import Dataset
 from peft import LoraConfig, get_peft_model
 from transformers import (
     AutoTokenizer,
@@ -23,12 +26,60 @@ from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 import tqdm as tqdm
 
 import llm_planner as llmp
-from utils import apply_template, load_dataset, strip
+from utils import apply_template
 
 from accelerate import Accelerator
 
 
 HF_USER_TOKEN = os.getenv("HF_USER_TOKEN")
+
+
+def load_dataset(config: dict) -> dict[str, Dataset]:
+    """Load the dataset from the configuration.
+
+    Args:
+        config (dict): The dataset configuration.
+
+    Returns:
+        dict[str, Dataset]: The loaded dataset.
+    """
+    with open(config["splits_path"], "r") as f:
+        split_ids_cfg = yaml.safe_load(f)
+
+    splits: set[str] = config.get("splits", {}).keys()
+    dataset = {split: defaultdict(list) for split in splits}
+
+    # Connect to database
+    conn = sqlite3.connect(config["database_path"])
+    c = conn.cursor()
+
+    # load domains
+    domains = {}
+    c.execute("SELECT name, domain_pddl FROM domains")
+    for domain_name, domain_pddl in c.fetchall():
+        domains[domain_name] = domain_pddl
+
+    # load problems
+    for split in splits:
+        queries = []
+        split_keys: list[str] = config["splits"][split]
+        for split_key in split_keys:
+            split_ids = split_ids_cfg
+            for key in split_key:
+                split_ids = split_ids[key]
+
+            c.execute(
+                f"SELECT domain, problem_pddl, natural_language FROM problems WHERE id in ({', '.join(['?'] * len(split_ids))})",
+                split_ids,
+            )
+            queries.extend(c.fetchall())
+
+        for domain, problem_pddl, natural_language in queries:
+            dataset[split]["domain"].append(domains[domain])
+            dataset[split]["problem"].append(problem_pddl)
+            dataset[split]["natural_language"].append(natural_language)
+
+    return {s: Dataset.from_dict(d, split=s) for s, d in dataset.items()}
 
 
 def find_all_linear_names(
@@ -60,6 +111,10 @@ def find_all_linear_names(
     if "lm_head" in lora_module_names:  # needed for 16-bit
         lora_module_names.remove("lm_head")
     return list(lora_module_names)
+
+
+def strip(text: str, bos_token: str, eos_token: str) -> str:
+    return text.removeprefix(bos_token) + eos_token
 
 
 def preprocess(
@@ -130,7 +185,7 @@ def load_model(config: dict) -> tuple[PreTrainedTokenizer, PreTrainedModel]:
         )
     else:
         bnb_config = None
-    
+
     device_index = Accelerator().process_index
     device_map = {"": device_index}
     model = AutoModelForCausalLM.from_pretrained(
@@ -139,7 +194,7 @@ def load_model(config: dict) -> tuple[PreTrainedTokenizer, PreTrainedModel]:
         token=HF_USER_TOKEN,
         torch_dtype=torch.bfloat16,
         quantization_config=bnb_config,
-        device_map=device_map
+        device_map=device_map,
     )
 
     lora_config = LoraConfig(
