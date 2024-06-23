@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable, Mapping
 
 import dotenv
 
@@ -30,7 +30,7 @@ signal.signal(signal.SIGALRM, signal_handler)
 
 
 def timeout_and_retry(
-    func: callable,
+    func: Callable,
     *args,
     timeout: int = 30,
     retries: int = 5,
@@ -39,7 +39,7 @@ def timeout_and_retry(
     """Run a function with a timeout and retries.
 
     Args:
-        func (callable): The function to run.
+        func (Callable): The function to run.
         timeout (int, optional): Seconds per attempt. Defaults to 30.
         retries (int, optional): Number of retries. Defaults to 5.
 
@@ -113,8 +113,6 @@ def plan(
     messages = [context + m for m in messages]
     if isinstance(planner, llmp.HFPlanner):
         device = planner.model.device
-    elif isinstance(planner, llmp.OpenAIPlanner):
-        messages = messages[0]  # can't handle multiple messages
 
     return planner.plan_chat(
         messages,
@@ -123,11 +121,11 @@ def plan(
     )
 
 
-def load_planner(config: dict[str, dict[str, str]]) -> llmp.Planner:
+def load_planner(config: Mapping[str, dict[str, str]]) -> llmp.Planner:
     """Load a model based on the configuration.
 
     Args:
-        config (dict[str, str]): The configuration for the model.
+        config (Mapping[str, str]): The configuration for the model.
 
     Raises:
         ValueError: If the model type is not 'openai' or 'hf'.
@@ -160,7 +158,7 @@ def load_planner(config: dict[str, dict[str, str]]) -> llmp.Planner:
 def fast_equivalence(
     problem_pddl: str,
     llm_problem_pddl: str,
-) -> tuple[bool, tuple[bool, bool, bool], dict[graph.ProblemGraph]]:
+) -> tuple[bool, tuple[bool, bool, bool], dict[str, graph.ProblemGraph]]:
     """Evaluate a PDDL problem quickly (if possible).
 
     Args:
@@ -325,14 +323,14 @@ def load_problem_ids(config: dict, splits: list[str]) -> list[int]:
 
 
 def load_ungenerated_problems(
-    config: dict[str, str | Any],
+    config: Mapping[str, str | Any],
     config_str: str,
     problem_ids: list[int],
 ) -> dict[int, llmp.PlanningProblem]:
     """Load a list of problems from the database.
 
     Args:
-        config (dict[str, str | Any]): The configuration for the database.
+        config (Mapping[str, str | Any]): The configuration for the database.
         config_str (str): The configuration string.
         problem_ids (list[int]): The list of problem ids to load.
 
@@ -604,7 +602,7 @@ def main(config_path: str):
             configuration for the evaluation.
     """
     with open(config_path, "r") as f:
-        config: dict[str, dict[str, str | list[str] | bool]] = yaml.safe_load(f)
+        config: dict = yaml.safe_load(f)
 
     config_str = yaml.dump(config["evaluate"]["model"])
 
@@ -612,13 +610,18 @@ def main(config_path: str):
 
     # Get LLM output first
     problems = load_ungenerated_problems(config, config_str, problem_ids)
-    # if len(problems) > 0:
-    #     if config["evaluate"]["model"]["type"] == "openai":
-    #         generate_openai(problems, config, config_str)
-    #     elif config["evaluate"]["model"]["type"] == "hf":
-    #         generate_hf(problems, config, config_str)
 
-    evaluate(problem_ids, config)
+    if len(problems) > 0:
+        print("Generating: Run script with same arguments again to evaluate.")
+        # It is very hard if not impossible at the moment to kill the vLLM
+        # Ray, so re-running the script is the best option at the
+        # moment.
+        if config["evaluate"]["model"]["type"] == "openai":
+            generate_openai(problems, config, config_str)
+        elif config["evaluate"]["model"]["type"] == "hf":
+            generate_hf(problems, config, config_str)
+    else:
+        evaluate(problem_ids, config)
 
 
 if __name__ == "__main__":
