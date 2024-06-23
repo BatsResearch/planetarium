@@ -2,7 +2,7 @@ import pytest
 
 from .test_pddl import problem_string
 
-from planetarium import pddl
+from planetarium import builder
 
 
 @pytest.fixture
@@ -10,7 +10,7 @@ def sgraph(problem_string):
     """
     Fixture providing an SGraph instance built from a PDDL problem string.
     """
-    return pddl.build(problem_string).decompose()[0]
+    return builder.build(problem_string).decompose()[0]
 
 
 class TestGraph:

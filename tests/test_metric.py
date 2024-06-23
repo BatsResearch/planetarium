@@ -1,6 +1,6 @@
 import pytest
 
-from planetarium import graph, metric, oracle, pddl
+from planetarium import builder, graph, metric, oracle
 
 # pylint: disable=unused-import
 from .test_pddl import (
@@ -200,16 +200,16 @@ class TestMetrics:
 
     def test_map(self, problem_string, two_initial_problem_string):
         """Test the mapping function on graph pairs."""
-        problem_graph = pddl.build(problem_string)
-        problem_graph2 = pddl.build(two_initial_problem_string)
+        problem_graph = builder.build(problem_string)
+        problem_graph2 = builder.build(two_initial_problem_string)
 
         assert metric.isomorphic(problem_graph, problem_graph)
         assert not metric.isomorphic(problem_graph, problem_graph2)
 
     def test_validate(self, problem_string, two_initial_problem_string):
         """Test the validation function on graph pairs."""
-        problem_graph = pddl.build(problem_string)
-        problem_graph2 = pddl.build(two_initial_problem_string)
+        problem_graph = builder.build(problem_string)
+        problem_graph2 = builder.build(two_initial_problem_string)
 
         assert metric.equals(problem_graph, problem_graph, is_placeholder=True)
         assert not metric.equals(
@@ -222,8 +222,8 @@ class TestMetrics:
         """
         Test the distance function on graph pairs.
         """
-        swap_problem = pddl.build(swap_problem_string)
-        wrong_swap = pddl.build(wrong_swap_problem_string)
+        swap_problem = builder.build(swap_problem_string)
+        wrong_swap = builder.build(wrong_swap_problem_string)
 
         # Test validate
         assert metric.equals(swap_problem, swap_problem, is_placeholder=False)
@@ -234,8 +234,8 @@ class TestMetrics:
         """
         Test the distance function on graph pairs.
         """
-        move_problem = pddl.build(move_problem_string)
-        wrong_move = pddl.build(wrong_move_problem_string)
+        move_problem = builder.build(move_problem_string)
+        wrong_move = builder.build(wrong_move_problem_string)
 
         # Test validate
         assert metric.equals(move_problem, move_problem, is_placeholder=True)
@@ -249,10 +249,10 @@ class TestMetrics:
         blocksworld_underspecified,
     ):
         """Test the equivalence of blocksworld problems."""
-        p1 = pddl.build(blocksworld_fully_specified)
-        p2 = pddl.build(blocksworld_missing_clears)
-        p3 = pddl.build(blocksworld_missing_ontables)
-        p4 = pddl.build(blocksworld_underspecified)
+        p1 = builder.build(blocksworld_fully_specified)
+        p2 = builder.build(blocksworld_missing_clears)
+        p3 = builder.build(blocksworld_missing_ontables)
+        p4 = builder.build(blocksworld_underspecified)
 
         p1 = oracle.fully_specify(p1)
         p2 = oracle.fully_specify(p2)

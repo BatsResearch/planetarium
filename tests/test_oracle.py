@@ -1,6 +1,6 @@
 import pytest
 
-from planetarium import graph, oracle, pddl
+from planetarium import builder, graph, oracle
 
 
 @pytest.fixture
@@ -872,7 +872,7 @@ class TestBlocksworldOracle:
         """
         Test the fully specified blocksworld problem.
         """
-        problem = pddl.build(blocksworld_fully_specified)
+        problem = builder.build(blocksworld_fully_specified)
         full = oracle.fully_specify(problem)
         assert oracle.fully_specify(full) == full
 
@@ -880,7 +880,7 @@ class TestBlocksworldOracle:
         """
         Test the fully specified blocksworld problem with missing clears.
         """
-        problem = pddl.build(blocksworld_missing_clears)
+        problem = builder.build(blocksworld_missing_clears)
         full = oracle.fully_specify(problem)
         assert oracle.fully_specify(full) == full
 
@@ -888,7 +888,7 @@ class TestBlocksworldOracle:
         """
         Test the fully specified blocksworld problem with missing clears.
         """
-        problem = pddl.build(blocksworld_missing_ontables)
+        problem = builder.build(blocksworld_missing_ontables)
         full = oracle.fully_specify(problem)
         assert oracle.fully_specify(full) == full
 
@@ -896,7 +896,7 @@ class TestBlocksworldOracle:
         """
         Test the fully specified blocksworld problem with missing clears.
         """
-        problem = pddl.build(blocksworld_underspecified)
+        problem = builder.build(blocksworld_underspecified)
         full = oracle.fully_specify(problem)
         assert oracle.fully_specify(full) == full
 
@@ -923,7 +923,7 @@ class TestBlocksworldOracle:
         ]
 
         for desc in descs:
-            problem = pddl.build(desc)
+            problem = builder.build(desc)
             init, goal = problem.decompose()
             assert reduce_and_inflate(init)
             assert reduce_and_inflate(goal)
@@ -947,7 +947,7 @@ class TestBlocksworldOracle:
             blocksworld_invalid_2,
             blocksworld_invalid_3,
         ):
-            problem = pddl.build(desc)
+            problem = builder.build(desc)
             _, goal = problem.decompose()
             with pytest.raises(ValueError):
                 oracle.reduce(goal, validate=True)
@@ -969,15 +969,15 @@ class TestGripperOracle:
         """
         Test the fully specified gripper problem.
         """
-        problem = pddl.build(gripper_fully_specified)
+        problem = builder.build(gripper_fully_specified)
         full = oracle.fully_specify(problem)
         assert oracle.fully_specify(full) == full
 
-        problem = pddl.build(gripper_no_goal_types)
+        problem = builder.build(gripper_no_goal_types)
         full = oracle.fully_specify(problem)
         assert oracle.fully_specify(full) == full
 
-        problem = pddl.build(gripper_fully_specified_not_strict)
+        problem = builder.build(gripper_fully_specified_not_strict)
         full = oracle.fully_specify(problem)
         assert oracle.fully_specify(full) == full
 
@@ -986,7 +986,7 @@ class TestGripperOracle:
         Test the inflate function.
         """
 
-        init, goal = pddl.build(gripper_fully_specified).decompose()
+        init, goal = builder.build(gripper_fully_specified).decompose()
         assert reduce_and_inflate(init)
         assert reduce_and_inflate(goal)
 
@@ -1006,7 +1006,7 @@ class TestGripperOracle:
             gripper_underspecified_3,
         ]
         for desc in descs:
-            problem = pddl.build(desc)
+            problem = builder.build(desc)
             init, goal = problem.decompose()
 
             assert reduce_and_inflate(init)
@@ -1018,16 +1018,16 @@ class TestGripperOracle:
         gripper_underspecified_1,
         gripper_underspecified_2,
     ):
-        problem = pddl.build(gripper_underspecified_1)
+        problem = builder.build(gripper_underspecified_1)
         full = oracle.fully_specify(problem)
         assert oracle.fully_specify(full) == full
 
-        problem = pddl.build(gripper_underspecified_2)
+        problem = builder.build(gripper_underspecified_2)
         full = oracle.fully_specify(problem)
         assert oracle.fully_specify(full) == full
 
     def test_invalid(self, gripper_invalid):
-        problem = pddl.build(gripper_invalid)
+        problem = builder.build(gripper_invalid)
         _, goal = problem.decompose()
         with pytest.raises(ValueError):
             oracle.reduce(goal, validate=True)
@@ -1037,7 +1037,7 @@ class TestGripperOracle:
 
 class TestUnsupportedDomain:
     def test_reduce_and_inflate(self, gripper_fully_specified):
-        problem = pddl.build(gripper_fully_specified)
+        problem = builder.build(gripper_fully_specified)
         init, goal = problem.decompose()
 
         with pytest.raises(ValueError):
@@ -1047,6 +1047,6 @@ class TestUnsupportedDomain:
             oracle.inflate(reduced, domain="gripper-modified")
 
     def test_fully_specify(self, gripper_fully_specified):
-        problem = pddl.build(gripper_fully_specified)
+        problem = builder.build(gripper_fully_specified)
         with pytest.raises(ValueError):
             oracle.fully_specify(problem, domain="gripper-modified")
