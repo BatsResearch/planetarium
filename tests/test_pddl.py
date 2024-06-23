@@ -255,6 +255,44 @@ def wrong_move_problem_string():
         )
     """
 
+@pytest.fixture
+def single_predicate_goal():
+    """
+    Fixture providing a sample PDDL problem definition as a string.
+    """
+    return """
+        (define (problem move)
+          (:domain move)
+          (:objects a0 a1 - object
+                    b0 b1 - room)
+
+          (:init
+            (in a0 b0)
+            (in a1 b1))
+
+          (:goal (in a0 b0))
+        )
+    """
+
+@pytest.fixture
+def not_predicate_goal():
+    """
+    Fixture providing a sample PDDL problem definition as a string.
+    """
+    return """
+        (define (problem move)
+          (:domain move)
+          (:objects a0 a1 - object
+                    b0 b1 - room)
+
+          (:init
+            (in a0 b0)
+            (in a1 b1))
+
+          (:goal (not
+            (in a0 b0)))
+        )
+    """
 
 @pytest.fixture
 def problem(problem_string):
@@ -370,3 +408,16 @@ class TestBuild:
         modified_problem_string = f"Here is an example of a problem string that is not a PDDL problem. ```pddl\n{problem_string}\n```"
         graph_1, graph_2 = pddl.build(modified_problem_string).decompose()
         assert len(graph_1.edges) == 21 and len(graph_2.edges) == 2
+
+    def test_single_predicate_goal(self, single_predicate_goal):
+        """
+        Test the size of nodes in the scene graphs built from a PDDL problem.
+        """
+        pddl.build(single_predicate_goal).decompose()
+
+    def test_not_predicate_goal(self, not_predicate_goal):
+        """
+        Test the size of nodes in the scene graphs built from a PDDL problem.
+        """
+        with pytest.raises(ValueError):
+            pddl.build(not_predicate_goal).decompose()

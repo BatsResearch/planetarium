@@ -210,7 +210,7 @@ def fast_equivalence(
         problem_graph = pddl.build(problem_pddl)
         init, _ = problem_graph.decompose()
 
-        if len(llm_problem_graph._constants) != len(problem_graph._constants):
+        if len(llm_problem_graph.constants) != len(problem_graph.constants):
             resolved = True
             return result()
 
@@ -255,8 +255,8 @@ def full_equivalence(
         bool: True if the scene graphs are equivalent, False otherwise.
     """
     return metric.equals(
-        oracle.fully_specify(source),
-        oracle.fully_specify(target),
+        oracle.fully_specify(source, return_reduced=True),
+        oracle.fully_specify(target, return_reduced=True),
         is_placeholder=is_placeholder,
     )
 
@@ -612,8 +612,6 @@ def main(config_path: str):
 
     # Get LLM output first
     problems = load_ungenerated_problems(config, config_str, problem_ids)
-    print(config_str)
-    print(len(problems))
     # if len(problems) > 0:
     #     if config["evaluate"]["model"]["type"] == "openai":
     #         generate_openai(problems, config, config_str)

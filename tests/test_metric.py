@@ -203,8 +203,6 @@ class TestMetrics:
         problem_graph = pddl.build(problem_string)
         problem_graph2 = pddl.build(two_initial_problem_string)
 
-        initial, goal = problem_graph.decompose()
-
         assert metric.isomorphic(problem_graph, problem_graph)
         assert not metric.isomorphic(problem_graph, problem_graph2)
 

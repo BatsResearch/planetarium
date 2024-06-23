@@ -62,7 +62,6 @@ def _node_matching(
     Returns:
         bool: True if nodes match, False otherwise.
     """
-    print(source, target, "yeehaw")
     match (source.label, target.label):
         case (graph.Label.CONSTANT, graph.Label.CONSTANT):
             return _same_typing(source, target) and (

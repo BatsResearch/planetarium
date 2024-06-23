@@ -9,46 +9,116 @@ import rustworkx as rx
 from planetarium import graph
 
 
-class ReducedNode(tuple, enum.Enum):
-    TABLE = ("table", ("blocksworld",))
-    CLEAR = ("clear", ("blocksworld", "gripper"))
-    ARM = ("arm", ("blocksworld",))
-    ROOMS = ("rooms", ("gripper",))
-    BALLS = ("balls", ("gripper",))
-    GRIPPERS = ("grippers", ("gripper",))
-    ROBBY = ("robby", ("gripper",))
+class ReducedNode(str, enum.Enum):
+    TABLE = "table"
+    CLEAR = "clear"
+    ARM = "arm"
+    ROOMS = "room"
+    BALLS = "ball"
+    GRIPPERS = "gripper"
+    ROBBY = "at-robby"
+    FREE = "free"
 
 
-class ReducedGraph(graph.PlanGraph):
+BlocksworldReducedNodes = {
+    ReducedNode.TABLE,
+    ReducedNode.CLEAR,
+    ReducedNode.ARM,
+}
+
+GripperReducedNodes = {
+    ReducedNode.ROOMS,
+    ReducedNode.BALLS,
+    ReducedNode.GRIPPERS,
+    ReducedNode.ROBBY,
+    ReducedNode.FREE,
+}
+
+ReducedNodes = {
+    "blocksworld": BlocksworldReducedNodes,
+    "gripper": GripperReducedNodes,
+}
+
+
+class ReducedSceneGraph(graph.PlanGraph):
     def __init__(
         self,
         constants: list[dict[str, Any]],
-        predicates: list[dict[str, Any]],
+        domain: str,
+        scene: graph.Scene | None = None,
+    ):
+        super().__init__(constants, domain=domain)
+        self.scene = scene
+
+        for e in ReducedNodes[domain]:
+            predicate = e.value
+            self.add_node(
+                graph.PlanGraphNode(
+                    e,
+                    name=predicate,
+                    label=graph.Label.PREDICATE,
+                    typing={predicate},
+                ),
+            )
+
+
+class ReducedProblemGraph(graph.PlanGraph):
+    def __init__(
+        self,
+        constants: list[dict[str, Any]],
         domain: str,
     ):
-        super().__init__(constants, predicates, domain=domain)
+        super().__init__(constants, domain=domain)
 
-        for e in ReducedNode:
-            predicate, r_node_domains = e.value
-            if self.domain in r_node_domains:
-                self.add_node(
-                    graph.PlanGraphNode(
-                        e,
-                        name=predicate,
-                        label=graph.Label.PREDICATE,
-                        typing={predicate},
-                    ),
-                )
+        for e in ReducedNodes[domain]:
+            predicate = e.value
+            self.add_node(
+                graph.PlanGraphNode(
+                    e,
+                    name=predicate,
+                    label=graph.Label.PREDICATE,
+                    typing={predicate},
+                ),
+            )
+
+    def decompose(self) -> tuple[ReducedSceneGraph, ReducedSceneGraph]:
+        init = ReducedSceneGraph(self.constants, self.domain, scene=graph.Scene.INIT)
+        goal = ReducedSceneGraph(self.constants, self.domain, scene=graph.Scene.GOAL)
+
+        for u, v, edge in self.edges:
+            edge = copy.deepcopy(edge)
+            if edge.scene == graph.Scene.INIT:
+                init.add_edge(u, v, edge)
+            elif edge.scene == graph.Scene.GOAL:
+                goal.add_edge(u, v, edge)
+
+        return init, goal
+
+    @staticmethod
+    def join(init: ReducedSceneGraph, goal: ReducedSceneGraph) -> "ReducedProblemGraph":
+        problem = ReducedProblemGraph(init.constants, domain=init.domain)
+
+        for u, v, edge in init.edges:
+            edge = copy.deepcopy(edge)
+            problem.add_edge(u, v, edge)
+            edge.scene = graph.Scene.INIT
+        for u, v, edge in goal.edges:
+            edge = copy.deepcopy(edge)
+            edge.scene = graph.Scene.GOAL
+            problem.add_edge(u, v, edge)
+
+        return problem
 
 
 def _reduce_blocksworld(
-    scene: graph.SceneGraph,
+    scene: graph.SceneGraph | graph.ProblemGraph,
     validate: bool = True,
-) -> ReducedGraph:
+) -> ReducedSceneGraph | ReducedProblemGraph:
     """Reduces a blocksworld scene graph to a Directed Acyclic Graph.
 
     Args:
-        problem (graph.SceneGraph): The scene graph to reduce.
+        problem (graph.SceneGraph | graph.ProblemGraph): The scene graph to
+            reduce.
         validate (bool, optional): Whether or not to validate if the reduced
             reprsentation is valid. Defaults to True.
 
@@ -66,33 +136,42 @@ def _reduce_blocksworld(
     for node in scene.nodes:
         nodes[node.label].append(node)
 
-    reduced = ReducedGraph(
-        constants=scene._constants,
-        predicates=scene._predicates,
-        domain="blocksworld",
-    )
-
-    if "arm-empty" in scene.predicates:
-        reduced.add_edge(
-            ReducedNode.CLEAR,
-            ReducedNode.ARM,
-            graph.PlanGraphEdge(predicate="arm-empty"),
+    if isinstance(scene, graph.ProblemGraph):
+        reduced = ReducedProblemGraph(constants=scene.constants, domain="blocksworld")
+    elif isinstance(scene, graph.SceneGraph):
+        reduced = ReducedSceneGraph(
+            constants=scene.constants,
+            domain="blocksworld",
+            scene=scene.scene,
         )
+    else:
+        raise ValueError("Scene must be a SceneGraph or ProblemGraph.")
+
+    for pred_node in scene.predicate_nodes:
+        if pred_node.typing == "arm-empty":
+            reduced.add_edge(
+                ReducedNode.CLEAR,
+                ReducedNode.ARM,
+                graph.PlanGraphEdge(
+                    predicate="arm-empty",
+                    scene=pred_node.scene,
+                ),
+            )
 
     pred_nodes = set()
     for node, obj, edge in scene.edges:
         pred = edge.predicate
-        reduced_edge = graph.PlanGraphEdge(predicate=pred)
+        reduced_edge = graph.PlanGraphEdge(predicate=pred, scene=edge.scene)
         if node in pred_nodes:
             continue
-        elif pred == "on-table":
+        if pred == "on-table":
             reduced.add_edge(obj, ReducedNode.TABLE, reduced_edge)
         elif pred == "clear":
             reduced.add_edge(ReducedNode.CLEAR, obj, reduced_edge)
         elif pred == "on":
             pos = edge.position
             other_obj, *_ = [
-                v.node for _, v, a in scene.out_edges(node) if a.position == 1 - pos
+                v.node for v, a in scene.out_edges(node) if a.position == 1 - pos
             ]
             if pos == 0:
                 reduced.add_edge(obj, other_obj, reduced_edge)
@@ -101,31 +180,51 @@ def _reduce_blocksworld(
         pred_nodes.add(node)
 
     if validate:
-        if not rx.is_directed_acyclic_graph(reduced.graph):
-            raise ValueError("Scene graph is not a Directed Acyclic Graph.")
-        for node in reduced.nodes:
-            if (
-                node.node != ReducedNode.TABLE and reduced.in_degree(node.node) > 1
-            ) or (node.node != ReducedNode.CLEAR and reduced.out_degree(node.node) > 1):
-                raise ValueError(
-                    f"Node {node} has multiple parents/children. (not possible in blocksworld)."
-                )
-            if reduced.in_degree(ReducedNode.ARM) == 1:
-                obj = reduced.predecessors(ReducedNode.ARM)[0]
-                if (
-                    obj.node != ReducedNode.CLEAR
-                    and reduced.in_degree(obj) == 1
-                    and reduced.predecessors(obj)[0].node != ReducedNode.CLEAR
-                ):
-                    raise ValueError("Object on arm is connected to another object.")
+        if isinstance(reduced, ReducedProblemGraph):
+            init, goal = reduced.decompose()
+            _validate_blocksworld(init)
+            _validate_blocksworld(goal)
+        elif isinstance(reduced, ReducedSceneGraph):
+            _validate_blocksworld(reduced)
 
     return reduced
 
 
+def _validate_blocksworld(scene: graph.SceneGraph):
+    """Validates a blocksworld scene graph.
+
+    Args:
+        scene (graph.SceneGraph): The scene graph to validate.
+
+    Raises:
+        ValueError: If the scene graph is not a Directed Acyclic Graph.
+        ValueError: If a node has multiple parents/children (not allowed in
+            blocksworld).
+        ValueError: If an object on the arm is connected to another object.
+    """
+    if not rx.is_directed_acyclic_graph(scene.graph):
+        raise ValueError("Scene graph is not a Directed Acyclic Graph.")
+    for node in scene.nodes:
+        if (
+            node.node != ReducedNode.TABLE and scene.in_degree(node.node) > 1
+        ) or (node.node != ReducedNode.CLEAR and scene.out_degree(node.node) > 1):
+            raise ValueError(
+                f"Node {node} has multiple parents/children. (not possible in blocksworld)."
+            )
+        if scene.in_degree(ReducedNode.ARM) == 1:
+            obj = scene.predecessors(ReducedNode.ARM)[0]
+            if (
+                obj.node != ReducedNode.CLEAR
+                and scene.in_degree(obj) == 1
+                and scene.predecessors(obj)[0].node != ReducedNode.CLEAR
+            ):
+                raise ValueError("Object on arm is connected to another object.")
+
+
 def _reduce_gripper(
-    scene: graph.SceneGraph,
+    scene: graph.SceneGraph | graph.ProblemGraph,
     validate: bool = True,
-) -> ReducedGraph:
+) -> ReducedSceneGraph | ReducedProblemGraph:
     """Reduces a gripper scene graph to a Directed Acyclic Graph.
 
     Args:
@@ -140,22 +239,27 @@ def _reduce_gripper(
     for node in scene.nodes:
         nodes[node.label].append(node)
 
-    reduced = ReducedGraph(
-        constants=scene._constants,
-        predicates=scene._predicates,
-        domain="gripper",
-    )
+    if isinstance(scene, graph.ProblemGraph):
+        reduced = ReducedProblemGraph(constants=scene.constants, domain="gripper")
+    elif isinstance(scene, graph.SceneGraph):
+        reduced = ReducedSceneGraph(
+            constants=scene.constants,
+            domain="gripper",
+            scene=scene.scene,
+        )
+    else:
+        raise ValueError("Scene must be a SceneGraph or ProblemGraph.")
 
     pred_nodes = set()
     for node, obj, edge in scene.edges:
         pred = edge.predicate
-        reduced_edge = graph.PlanGraphEdge(predicate=pred)
+        reduced_edge = graph.PlanGraphEdge(predicate=pred, scene=edge.scene)
         if node in pred_nodes:
             continue
         elif pred == "at-robby":
             reduced.add_edge(ReducedNode.ROBBY, obj, reduced_edge)
         elif pred == "free":
-            reduced.add_edge(ReducedNode.CLEAR, obj, reduced_edge)
+            reduced.add_edge(ReducedNode.FREE, obj, reduced_edge)
         elif pred == "ball":
             reduced.add_edge(ReducedNode.BALLS, obj, reduced_edge)
         elif pred == "gripper":
@@ -165,20 +269,30 @@ def _reduce_gripper(
         elif pred in {"carry", "at"}:
             pos = edge.position
             other_obj, *_ = [
-                v for _, v, a in scene.out_edges(node) if a.position == 1 - pos
+                v for v, a in scene.out_edges(node) if a.position == 1 - pos
             ]
             if pos == 0:
                 reduced.add_edge(obj, other_obj, reduced_edge)
 
         pred_nodes.add(node)
 
-    if validate and not rx.is_directed_acyclic_graph(reduced.graph):
-        raise ValueError("Scene graph is not a Directed Acyclic Graph.")
+    if validate:
+        if isinstance(reduced, ReducedProblemGraph):
+            init, goal = reduced.decompose()
+            if not rx.is_directed_acyclic_graph(init.graph):
+                raise ValueError("Initial scene graph is not a Directed Acyclic Graph.")
+            if not rx.is_directed_acyclic_graph(goal.graph):
+                raise ValueError("Goal scene graph is not a Directed Acyclic Graph.")
+        elif isinstance(reduced, ReducedSceneGraph):
+            if rx.is_directed_acyclic_graph(reduced.graph):
+                raise ValueError("Scene graph is not a Directed Acyclic Graph.")
 
     return reduced
 
 
-def _inflate_blocksworld(scene: ReducedGraph) -> graph.SceneGraph:
+def _inflate_blocksworld(
+    scene: ReducedSceneGraph | ReducedProblemGraph,
+) -> graph.SceneGraph:
     """Respecify a blocksworld scene graph.
 
     Args:
@@ -194,12 +308,13 @@ def _inflate_blocksworld(scene: ReducedGraph) -> graph.SceneGraph:
         if not isinstance(node.node, ReducedNode):
             constants.append({"name": node.node, "typing": node.typing})
 
-    for u, v, _ in scene.edges:
+    for u, v, edge in scene.edges:
         if u.node == ReducedNode.CLEAR and v.node == ReducedNode.ARM:
             predicates.append(
                 {
                     "typing": "arm-empty",
                     "parameters": [],
+                    "scene": edge.scene,
                 }
             )
         elif u.node == ReducedNode.CLEAR:
@@ -207,6 +322,7 @@ def _inflate_blocksworld(scene: ReducedGraph) -> graph.SceneGraph:
                 {
                     "typing": "clear",
                     "parameters": [v.node],
+                    "scene": edge.scene,
                 }
             )
         elif v.node == ReducedNode.TABLE:
@@ -214,6 +330,7 @@ def _inflate_blocksworld(scene: ReducedGraph) -> graph.SceneGraph:
                 {
                     "typing": "on-table",
                     "parameters": [u.node],
+                    "scene": edge.scene,
                 }
             )
         elif v.node == ReducedNode.ARM:
@@ -221,6 +338,7 @@ def _inflate_blocksworld(scene: ReducedGraph) -> graph.SceneGraph:
                 {
                     "typing": "holding",
                     "parameters": [u.node],
+                    "scene": edge.scene,
                 }
             )
         else:
@@ -228,13 +346,29 @@ def _inflate_blocksworld(scene: ReducedGraph) -> graph.SceneGraph:
                 {
                     "typing": "on",
                     "parameters": [u.node, v.node],
+                    "scene": edge.scene,
                 }
             )
 
-    return graph.SceneGraph(constants, predicates, domain="blocksworld")
+    if isinstance(scene, ReducedProblemGraph):
+        return graph.ProblemGraph(
+            constants,
+            [pred for pred in predicates if pred["scene"] == graph.Scene.INIT],
+            [pred for pred in predicates if pred["scene"] == graph.Scene.GOAL],
+            domain="blocksworld",
+        )
+    else:
+        return graph.SceneGraph(
+            constants,
+            predicates,
+            domain="blocksworld",
+            scene=scene.scene,
+        )
 
 
-def _inflate_gripper(scene: ReducedGraph) -> graph.SceneGraph:
+def _inflate_gripper(
+    scene: ReducedSceneGraph | ReducedProblemGraph,
+) -> graph.SceneGraph | graph.ProblemGraph:
     """Respecify a gripper scene graph.
 
     Args:
@@ -256,13 +390,15 @@ def _inflate_gripper(scene: ReducedGraph) -> graph.SceneGraph:
                 {
                     "typing": "at-robby",
                     "parameters": [v.node],
+                    "scene": edge.scene,
                 }
             )
-        elif u.node == ReducedNode.CLEAR:
+        elif u.node == ReducedNode.FREE:
             predicates.append(
                 {
                     "typing": "free",
                     "parameters": [v.node],
+                    "scene": edge.scene,
                 }
             )
         elif u.node == ReducedNode.BALLS:
@@ -270,6 +406,7 @@ def _inflate_gripper(scene: ReducedGraph) -> graph.SceneGraph:
                 {
                     "typing": "ball",
                     "parameters": [v.node],
+                    "scene": edge.scene,
                 }
             )
         elif u.node == ReducedNode.GRIPPERS:
@@ -277,6 +414,7 @@ def _inflate_gripper(scene: ReducedGraph) -> graph.SceneGraph:
                 {
                     "typing": "gripper",
                     "parameters": [v.node],
+                    "scene": edge.scene,
                 }
             )
         elif u.node == ReducedNode.ROOMS:
@@ -284,6 +422,7 @@ def _inflate_gripper(scene: ReducedGraph) -> graph.SceneGraph:
                 {
                     "typing": "room",
                     "parameters": [v.node],
+                    "scene": edge.scene,
                 }
             )
         else:
@@ -291,14 +430,28 @@ def _inflate_gripper(scene: ReducedGraph) -> graph.SceneGraph:
                 {
                     "typing": edge.predicate,
                     "parameters": [u.node, v.node],
+                    "scene": edge.scene,
                 }
             )
 
-    return graph.SceneGraph(constants, predicates, domain="gripper")
+    if isinstance(scene, ReducedProblemGraph):
+        return graph.ProblemGraph(
+            constants,
+            [pred for pred in predicates if pred["scene"] == graph.Scene.INIT],
+            [pred for pred in predicates if pred["scene"] == graph.Scene.GOAL],
+            domain="gripper",
+        )
+    else:
+        return graph.SceneGraph(
+            constants,
+            predicates,
+            domain="gripper",
+            scene=scene.scene,
+        )
 
 
 def _blocksworld_underspecified_blocks(
-    scene: ReducedGraph,
+    scene: ReducedSceneGraph,
 ) -> tuple[set[str], set[str], bool]:
     """Finds blocks that are not fully specified.
 
@@ -326,16 +479,27 @@ def _blocksworld_underspecified_blocks(
     return top_blocks, bottom_blocks, not arm_behavior_defined
 
 
-def _gripper_get_typed_objects(scene: ReducedGraph):
+def _gripper_get_typed_objects(
+    scene: ReducedSceneGraph,
+) -> dict[ReducedNode, set[graph.PlanGraphNode]]:
+    """Get the typed objects in a gripper scene graph.
+
+    Args:
+        scene (ReducedGraph): The reduced SceneGraph of a scene.
+
+    Returns:
+        dict[ReducedNode, set[graph.PlanGraphNode]]: The typed objects in the
+            scene graph.
+    """
     rooms = set()
     balls = set()
     grippers = set()
 
-    for _, node, _ in scene.out_edges(ReducedNode.ROOMS):
+    for node, _ in scene.out_edges(ReducedNode.ROOMS):
         rooms.add(node)
-    for _, node, _ in scene.out_edges(ReducedNode.BALLS):
+    for node, _ in scene.out_edges(ReducedNode.BALLS):
         balls.add(node)
-    for _, node, _ in scene.out_edges(ReducedNode.GRIPPERS):
+    for node, _ in scene.out_edges(ReducedNode.GRIPPERS):
         grippers.add(node)
 
     return {
@@ -346,8 +510,8 @@ def _gripper_get_typed_objects(scene: ReducedGraph):
 
 
 def _gripper_underspecified_blocks(
-    init: ReducedGraph,
-    goal: ReducedGraph,
+    init: ReducedSceneGraph,
+    goal: ReducedSceneGraph,
 ) -> tuple[set[str], set[str], bool]:
     """Finds blocks that are not fully specified.
 
@@ -371,7 +535,7 @@ def _gripper_underspecified_blocks(
     for ball in typed[ReducedNode.BALLS]:
         ball_edges = [
             node
-            for _, node, _ in goal.out_edges(ball)
+            for node, _ in goal.out_edges(ball)
             if not isinstance(node, ReducedNode)
         ]
         if not ball_edges:
@@ -380,7 +544,7 @@ def _gripper_underspecified_blocks(
         gripper_edges = [
             node
             for node, _ in goal.in_edges(gripper)
-            if node == ReducedNode.CLEAR or not isinstance(node, ReducedNode)
+            if node == ReducedNode.FREE or not isinstance(node, ReducedNode)
         ]
         if not gripper_edges:
             underspecified_grippers.add(gripper)
@@ -393,7 +557,7 @@ def _gripper_underspecified_blocks(
 
 
 def inflate(
-    scene: ReducedGraph,
+    scene: ReducedSceneGraph | ReducedProblemGraph,
     domain: str | None = None,
 ) -> graph.SceneGraph:
     """Inflate a reduced scene graph to a SceneGraph.
@@ -419,7 +583,7 @@ def inflate(
 def _detached_blocks(
     nodesA: set[str],
     nodesB: set[str],
-    scene: ReducedGraph,
+    scene: ReducedSceneGraph,
 ) -> tuple[set[str], set[str]]:
     """Finds nodes that are not connected to the rest of the scene graph.
 
@@ -439,7 +603,11 @@ def _detached_blocks(
         for b in nodesB:
             a_index = scene.nodes.index(a)
             b_index = scene.nodes.index(b)
-            if not rx.has_path(scene.graph, a_index, b_index, as_undirected=True):
+            if (
+                not rx.has_path(scene.graph, a_index, b_index)
+                and not rx.has_path(scene.graph, b_index, a_index)
+                and a != b
+            ):
                 _nodesA.discard(a)
                 _nodesB.discard(b)
 
@@ -447,7 +615,7 @@ def _detached_blocks(
 
 
 def _fully_specify_blocksworld(
-    scene: ReducedGraph,
+    scene: ReducedSceneGraph,
 ) -> graph.SceneGraph:
     """Fully specifies a blocksworld scene graph.
 
@@ -468,13 +636,13 @@ def _fully_specify_blocksworld(
         scene.add_edge(
             ReducedNode.CLEAR,
             block,
-            graph.PlanGraphEdge(predicate="clear"),
+            graph.PlanGraphEdge(predicate="clear", scene=scene.scene),
         )
     for block in bottom_blocks_:
         scene.add_edge(
             block,
             ReducedNode.TABLE,
-            graph.PlanGraphEdge(predicate="on-table"),
+            graph.PlanGraphEdge(predicate="on-table", scene=scene.scene),
         )
 
     # handle arm
@@ -482,16 +650,16 @@ def _fully_specify_blocksworld(
         scene.add_edge(
             ReducedNode.CLEAR,
             ReducedNode.ARM,
-            graph.PlanGraphEdge(predicate="arm-empty"),
+            graph.PlanGraphEdge(predicate="arm-empty", scene=scene.scene),
         )
 
     return scene
 
 
 def _fully_specify_gripper(
-    init: ReducedGraph,
-    goal: ReducedGraph,
-) -> ReducedGraph:
+    init: ReducedSceneGraph,
+    goal: ReducedSceneGraph,
+) -> ReducedSceneGraph:
     """Fully specifies a gripper scene graph.
 
     Adds any missing edges to fully specify the scene graph, without adding
@@ -506,6 +674,17 @@ def _fully_specify_gripper(
     """
     scene = copy.deepcopy(goal)
 
+    # bring "typing" predicates from init to goal
+    typed_objects = _gripper_get_typed_objects(init)
+    for typing, objects in typed_objects.items():
+        for obj in objects:
+            edge = graph.PlanGraphEdge(predicate=typing.value, scene=graph.Scene.GOAL)
+            edge_ = graph.PlanGraphEdge(predicate=typing.value)
+            if obj in scene.nodes and not (
+                scene.has_edge(typing, obj, edge) or scene.has_edge(typing, obj, edge_)
+            ):
+                scene.add_edge(typing, obj, edge)
+
     underspecified_balls, underspecified_grippers, _ = _gripper_underspecified_blocks(
         init,
         goal,
@@ -514,7 +693,7 @@ def _fully_specify_gripper(
     if underspecified_grippers and not underspecified_balls:
         for gripper in underspecified_grippers:
             scene.add_edge(
-                ReducedNode.CLEAR, gripper, graph.PlanGraphEdge(predicate="free")
+                ReducedNode.FREE, gripper, graph.PlanGraphEdge(predicate="free", scene=scene.scene)
             )
 
     return scene
@@ -523,6 +702,7 @@ def _fully_specify_gripper(
 def fully_specify(
     problem: graph.ProblemGraph,
     domain: str | None = None,
+    return_reduced: bool = False,
 ) -> graph.ProblemGraph:
     """Fully specifies a goal state.
 
@@ -531,95 +711,41 @@ def fully_specify(
             fully specify.
         domain (str | None, optional): The domain of the scene graph. Defaults
             to None.
+        return_reduced (bool, optional): Whether to return the reduced scene
+            graph. Defaults to False.
 
     Returns:
         graph.ProblemGraph: The fully specified problem graph.
     """
     domain = domain or problem.domain
-    init, goal = problem.decompose()
+    reduced_init, reduced_goal = reduce(problem).decompose()
+
     match domain:
         case "blocksworld":
-            reduced_goal = _reduce_blocksworld(goal)
             fully_specified_goal = _fully_specify_blocksworld(reduced_goal)
         case "gripper":
-            reduced_init = _reduce_gripper(init)
-            reduced_goal = _reduce_gripper(goal)
             fully_specified_goal = _fully_specify_gripper(
                 reduced_init,
                 reduced_goal,
             )
         case _:
             raise ValueError(f"Domain {domain} not supported.")
-    return graph.ProblemGraph.join(
-        init,
-        inflate(fully_specified_goal, domain=domain),
-    )
 
-
-def is_fully_specified(
-    problem: graph.ProblemGraph,
-    domain: str | None = None,
-    is_placeholder: bool = False,
-) -> bool:
-    """Checks if a goal state is fully specified.
-
-    Args:
-        problem (graph.ProblemGraph): The problem graph with the goal state to
-            evaluate.
-        domain (str | None, optional): The domain of the scene graph. Defaults
-            to None.
-        is_placeholder (bool, optional): Whether or not every edge must be
-            present. Defaults to False.
-
-    Raises:
-        ValueError: If a certain domain is provided but not supported.
-
-    Returns:
-        bool: True if the goal state is fully specified, False otherwise.
-    """
-    domain = domain or problem.domain
-    init, goal = problem.decompose()
-    match domain:
-        case "blocksworld":
-            reduced_goal = _reduce_blocksworld(goal)
-            top, bottom, arm_empty = _blocksworld_underspecified_blocks(reduced_goal)
-
-            if is_placeholder:
-                if bottom.intersection(top) and arm_empty:
-                    return False
-                return (not top) or (not bottom)
-            else:
-                return (not (top | bottom)) and not arm_empty
-        case "gripper":
-            reduced_init = _reduce_gripper(init)
-            reduced_goal = _reduce_gripper(goal)
-
-            balls, grippers, no_at_robby = _gripper_underspecified_blocks(
-                reduced_init,
-                reduced_goal,
-            )
-            # check number of typed objects is the same as total
-            goal_type_check = len(goal.constants) == len(
-                set().union(*_gripper_get_typed_objects(reduced_goal).values())
-            )
-            type_check = (
-                len(init.constants)
-                == len(set().union(*_gripper_get_typed_objects(reduced_init).values()))
-                and goal_type_check
-            )
-            if is_placeholder:
-                return len(balls) == 0 and not no_at_robby
-            else:
-                return len(balls or grippers) == 0 and not no_at_robby and type_check
-        case _:
-            raise ValueError(f"Domain {domain} not supported.")
+    if return_reduced:
+        return ReducedProblemGraph.join(reduced_init, fully_specified_goal)
+    else:
+        init, _ = problem.decompose()
+        return graph.ProblemGraph.join(
+            init,
+            inflate(fully_specified_goal, domain=domain),
+        )
 
 
 def reduce(
     graph: graph.SceneGraph,
     domain: str | None = None,
     validate: bool = True,
-) -> ReducedGraph:
+) -> ReducedSceneGraph | ReducedProblemGraph:
     """Reduces a scene graph to a Directed Acyclic Graph.
 
     Args:
