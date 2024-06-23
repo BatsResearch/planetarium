@@ -1,7 +1,5 @@
 # FastDownward python wrapper
 
-from typing import Optional, Tuple
-
 import glob
 import os
 import re
@@ -9,7 +7,7 @@ import subprocess
 import tempfile
 
 
-def _get_best_plan(plan_filepath: str) -> Tuple[str, float]:
+def _get_best_plan(plan_filepath: str) -> tuple[str, float]:
     best_cost = float("inf")
     best_plan = None
 
@@ -25,8 +23,12 @@ def _get_best_plan(plan_filepath: str) -> Tuple[str, float]:
 
 
 def plan(
-    domain: str, problem: str, downward: str = "downward", alias: str = "lama", **kwargs
-) -> Tuple[Optional[str], int]:
+    domain: str,
+    problem: str,
+    downward: str = "downward",
+    alias: str = "lama",
+    **kwargs,
+) -> tuple[str | None, int]:
     """Find plan using FastDownward.
 
     Args:
