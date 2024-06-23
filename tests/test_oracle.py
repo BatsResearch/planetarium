@@ -929,6 +929,13 @@ class TestBlocksworldOracle:
             assert reduce_and_inflate(goal)
             assert reduce_and_inflate(problem)
 
+            assert problem == oracle.inflate(
+                oracle.ReducedProblemGraph.join(
+                    oracle.reduce(init, validate=True),
+                    oracle.reduce(goal, validate=True),
+                )
+            )
+
     def test_invalid(
         self,
         blocksworld_invalid_1,
@@ -940,9 +947,12 @@ class TestBlocksworldOracle:
             blocksworld_invalid_2,
             blocksworld_invalid_3,
         ):
-            _, goal = pddl.build(desc).decompose()
+            problem = pddl.build(desc)
+            _, goal = problem.decompose()
             with pytest.raises(ValueError):
                 oracle.reduce(goal, validate=True)
+            with pytest.raises(ValueError):
+                oracle.reduce(problem, validate=True)
 
 
 class TestGripperOracle:
@@ -980,6 +990,29 @@ class TestGripperOracle:
         assert reduce_and_inflate(init)
         assert reduce_and_inflate(goal)
 
+    def test_reduce_inflate(
+        self,
+        gripper_fully_specified,
+        gripper_no_robby,
+        gripper_underspecified_1,
+        gripper_underspecified_2,
+        gripper_underspecified_3,
+    ):
+        descs = [
+            gripper_fully_specified,
+            gripper_no_robby,
+            gripper_underspecified_1,
+            gripper_underspecified_2,
+            gripper_underspecified_3,
+        ]
+        for desc in descs:
+            problem = pddl.build(desc)
+            init, goal = problem.decompose()
+
+            assert reduce_and_inflate(init)
+            assert reduce_and_inflate(goal)
+            assert reduce_and_inflate(problem)
+
     def test_underspecified(
         self,
         gripper_underspecified_1,
@@ -998,6 +1031,8 @@ class TestGripperOracle:
         _, goal = problem.decompose()
         with pytest.raises(ValueError):
             oracle.reduce(goal, validate=True)
+        with pytest.raises(ValueError):
+            oracle.reduce(problem, validate=True)
 
 
 class TestUnsupportedDomain:

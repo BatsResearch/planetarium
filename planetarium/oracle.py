@@ -205,9 +205,9 @@ def _validate_blocksworld(scene: graph.SceneGraph):
     if not rx.is_directed_acyclic_graph(scene.graph):
         raise ValueError("Scene graph is not a Directed Acyclic Graph.")
     for node in scene.nodes:
-        if (
-            node.node != ReducedNode.TABLE and scene.in_degree(node.node) > 1
-        ) or (node.node != ReducedNode.CLEAR and scene.out_degree(node.node) > 1):
+        if (node.node != ReducedNode.TABLE and scene.in_degree(node.node) > 1) or (
+            node.node != ReducedNode.CLEAR and scene.out_degree(node.node) > 1
+        ):
             raise ValueError(
                 f"Node {node} has multiple parents/children. (not possible in blocksworld)."
             )
@@ -284,7 +284,7 @@ def _reduce_gripper(
             if not rx.is_directed_acyclic_graph(goal.graph):
                 raise ValueError("Goal scene graph is not a Directed Acyclic Graph.")
         elif isinstance(reduced, ReducedSceneGraph):
-            if rx.is_directed_acyclic_graph(reduced.graph):
+            if not rx.is_directed_acyclic_graph(reduced.graph):
                 raise ValueError("Scene graph is not a Directed Acyclic Graph.")
 
     return reduced
@@ -693,7 +693,9 @@ def _fully_specify_gripper(
     if underspecified_grippers and not underspecified_balls:
         for gripper in underspecified_grippers:
             scene.add_edge(
-                ReducedNode.FREE, gripper, graph.PlanGraphEdge(predicate="free", scene=scene.scene)
+                ReducedNode.FREE,
+                gripper,
+                graph.PlanGraphEdge(predicate="free", scene=scene.scene),
             )
 
     return scene

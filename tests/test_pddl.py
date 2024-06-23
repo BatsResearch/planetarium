@@ -255,6 +255,7 @@ def wrong_move_problem_string():
         )
     """
 
+
 @pytest.fixture
 def single_predicate_goal():
     """
@@ -273,6 +274,7 @@ def single_predicate_goal():
           (:goal (in a0 b0))
         )
     """
+
 
 @pytest.fixture
 def not_predicate_goal():
@@ -293,6 +295,7 @@ def not_predicate_goal():
             (in a0 b0)))
         )
     """
+
 
 @pytest.fixture
 def problem(problem_string):
