@@ -15,6 +15,7 @@ pddl = {git = "https://github.com/maxzuo/pddl.git"}
 numpy = "^1.26.2"
 scipy = "^1.11.4"
 rustworkx = "^0.14.2"
+jinja2 = "^3.1.4"
 
 
 [tool.poetry.group.dev.dependencies]
