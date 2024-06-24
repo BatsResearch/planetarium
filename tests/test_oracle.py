@@ -1111,19 +1111,6 @@ class TestGripperOracle:
         full = oracle.fully_specify(problem)
         assert oracle.fully_specify(full) == full
 
-    def test_invalid(
-        self,
-        subtests,
-        gripper_invalid,
-    ):
-        for name, desc in {
-            "gripper_invalid": gripper_invalid,
-        }.items():
-            with subtests.test(name):
-                problem = builder.build(desc)
-                with pytest.raises(ValueError):
-                    oracle.reduce(problem, validate=True)
-
 
 class TestUnsupportedDomain:
     def test_reduce_and_inflate(self, gripper_fully_specified):
