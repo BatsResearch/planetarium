@@ -1117,13 +1117,13 @@ class TestUnsupportedDomain:
         problem = builder.build(gripper_fully_specified)
         init, goal = problem.decompose()
 
-        with pytest.raises(ValueError):
+        with pytest.raises(oracle.DomainNotSupportedError):
             oracle.reduce(init, domain="gripper-modified")
-        with pytest.raises(ValueError):
+        with pytest.raises(oracle.DomainNotSupportedError):
             reduced = oracle.reduce(goal, domain="gripper")
             oracle.inflate(reduced, domain="gripper-modified")
 
     def test_fully_specify(self, gripper_fully_specified):
         problem = builder.build(gripper_fully_specified)
-        with pytest.raises(ValueError):
+        with pytest.raises(oracle.DomainNotSupportedError):
             oracle.fully_specify(problem, domain="gripper-modified")

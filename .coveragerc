@@ -1,0 +1,4 @@
+[run]
+omit =
+    planetarium/downward.py
+    planetarium/evaluate.py
