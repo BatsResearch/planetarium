@@ -28,3 +28,12 @@ tar -xzvf tmp/linux64/*.tar.gz -C tmp/ --strip-components=1
 rm -rf tmp
 # Make sure to add fast-downward.sif and VAL to your PATH or make aliases.
 ```
+
+## Basic Usage
+To evaluate a PDDL problem description, we can use the `planetarium.evaluate` module:
+```python
+from planetarium import evaluate
+...
+evaluate.evaluate(gt_pddl_str, pred_pddl_str)
+```
+The supported domains are `blocksworld` and `gripper` domains.
