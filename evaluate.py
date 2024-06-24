@@ -11,15 +11,19 @@ import sqlite3
 import yaml
 
 from lark.exceptions import LarkError
+from pddl.core import Problem
+from pddl.formatter import problem_to_string
+from pddl.parser.problem import LenientProblemParser
 import tqdm
 import torch
 
-from planetarium import builder, graph, metric, oracle
+from planetarium import builder, downward, graph, metric, oracle
 import llm_planner as llmp
 
 from utils import apply_template
 
 HF_USER_TOKEN = os.getenv("HF_USER_TOKEN")
+VALIDATE = os.getenv("VALIDATE", "Validate")
 
 
 def signal_handler(signum, frame):
@@ -160,7 +164,7 @@ def load_planner(config: dict[str, dict[str, str]]) -> llmp.Planner:
 def fast_equivalence(
     problem_pddl: str,
     llm_problem_pddl: str,
-) -> tuple[bool, tuple[bool, bool, bool], dict[graph.ProblemGraph]]:
+) -> tuple[bool, tuple[bool, bool, bool], dict[str, graph.ProblemGraph]]:
     """Evaluate a PDDL problem quickly (if possible).
 
     Args:
@@ -261,9 +265,48 @@ def full_equivalence(
     )
 
 
+def clean(pddl_str: str) -> str:
+    """Clean a PDDL string.
+
+    Args:
+        pddl_str (str): The PDDL string to clean.
+
+    Returns:
+        str: The cleaned PDDL string.
+    """
+    problem: Problem = LenientProblemParser()(pddl_str)
+    return problem_to_string(problem)
+
+
+def validate(
+    pddl_str: str,
+    domain_str: str,
+) -> bool:
+    """Validate a PDDL problem as "solvable".
+
+    Args:
+        pddl_str (str): The PDDL problem.
+        domain_str (str): The PDDL domain.
+
+    Returns:
+        bool: Whether the PDDL is parseable and valid.
+    """
+    valid = False
+    pddl_str = clean(pddl_str)
+    try:
+        problem_graph = builder.build(pddl_str)
+        plan = oracle.plan_to_string(oracle.plan(problem_graph))
+        valid = downward.validate(domain_str, pddl_str, plan, VALIDATE)
+    except (LarkError, AttributeError, ValueError):
+        pass
+
+    return valid
+
+
 def equivalence(
     problem_pddl: str,
     llm_problem_pddl: str,
+    domains: dict[str, str],
     is_placeholder: bool = False,
 ) -> tuple[bool, bool, bool]:
     """Evaluate a PDDL problem and save the results.
@@ -271,6 +314,7 @@ def equivalence(
     Args:
         problem_pddl (str): The ground truth PDDL.
         llm_problem_pddl (str): The PDDL output from the LLM.
+        domains (dict[str, str]): The domains to use.
         is_placeholder (bool, optional): Whether the LLM output is a
             placeholder. Defaults to False.
 
@@ -288,7 +332,7 @@ def equivalence(
 
     return (
         parseable,
-        valid,
+        validate(llm_problem_pddl, domains[graphs["llm_problem_graph"].domain]),
         full_equivalence(
             graphs["problem_graph"],
             graphs["llm_problem_graph"],
@@ -508,7 +552,7 @@ def generate_hf(
 
 
 def _evaluate(args):
-    dataset_path, problem_id, config_str, model_name = args
+    domains, dataset_path, problem_id, config_str, model_name = args
     with sqlite3.connect(dataset_path) as conn:
         cursor = conn.cursor()
         cursor.execute(
@@ -528,6 +572,7 @@ def _evaluate(args):
             parseable, valid, equivalent = equivalence(
                 problem_pddl,
                 llm_problem_pddl,
+                domains,
                 bool(is_placeholder),
             )
             signal.alarm(0)
@@ -551,6 +596,9 @@ def evaluate(problem_ids: list[int], config: dict):
     """
     with sqlite3.connect(config["dataset"]["database_path"]) as conn:
         cursor = conn.cursor()
+        # get domains
+        cursor.execute("SELECT name, domain_pddl FROM domains")
+        domains = {name: domain for name, domain in cursor.fetchall()}
         cursor.execute(
             f"""SELECT problem_id, config, model_name FROM llm_outputs WHERE
             problem_id IN ({','.join('?' * len(problem_ids))})
@@ -563,6 +611,7 @@ def evaluate(problem_ids: list[int], config: dict):
     with mp.Pool(processes=max(1, min(mp.cpu_count(), len(problem_ids)))) as pool:
         args = (
             (
+                domains,
                 config["dataset"]["database_path"],
                 problem_id,
                 config_str,

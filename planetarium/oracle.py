@@ -4,6 +4,8 @@ from collections import defaultdict
 import copy
 import enum
 
+import jinja2 as jinja
+from pddl.core import Action
 import rustworkx as rx
 
 from planetarium import graph
@@ -39,6 +41,14 @@ ReducedNodes = {
     "gripper": GripperReducedNodes,
 }
 
+plan_template = jinja.Template(
+    """
+    {%- for action in actions -%}
+    ({{ action.name }} {{ action.parameters | join(", ") }})
+    {% endfor %}
+    """
+)
+
 
 class ReducedSceneGraph(graph.PlanGraph):
     def __init__(
@@ -46,8 +56,9 @@ class ReducedSceneGraph(graph.PlanGraph):
         constants: list[dict[str, Any]],
         domain: str,
         scene: graph.Scene | None = None,
+        requirements: tuple[str] = (),
     ):
-        super().__init__(constants, domain=domain)
+        super().__init__(constants, domain=domain, requirements=requirements)
         self.scene = scene
 
         for e in ReducedNodes[domain]:
@@ -67,8 +78,9 @@ class ReducedProblemGraph(graph.PlanGraph):
         self,
         constants: list[dict[str, Any]],
         domain: str,
+        requirements: tuple[str] = (),
     ):
-        super().__init__(constants, domain=domain)
+        super().__init__(constants, domain=domain, requirements=requirements)
 
         for e in ReducedNodes[domain]:
             predicate = e.value
@@ -82,8 +94,18 @@ class ReducedProblemGraph(graph.PlanGraph):
             )
 
     def decompose(self) -> tuple[ReducedSceneGraph, ReducedSceneGraph]:
-        init = ReducedSceneGraph(self.constants, self.domain, scene=graph.Scene.INIT)
-        goal = ReducedSceneGraph(self.constants, self.domain, scene=graph.Scene.GOAL)
+        init = ReducedSceneGraph(
+            self.constants,
+            self.domain,
+            scene=graph.Scene.INIT,
+            requirements=self._requirements,
+        )
+        goal = ReducedSceneGraph(
+            self.constants,
+            self.domain,
+            scene=graph.Scene.GOAL,
+            requirements=self._requirements,
+        )
 
         for u, v, edge in self.edges:
             edge = copy.deepcopy(edge)
@@ -96,7 +118,11 @@ class ReducedProblemGraph(graph.PlanGraph):
 
     @staticmethod
     def join(init: ReducedSceneGraph, goal: ReducedSceneGraph) -> "ReducedProblemGraph":
-        problem = ReducedProblemGraph(init.constants, domain=init.domain)
+        problem = ReducedProblemGraph(
+            init.constants,
+            domain=init.domain,
+            requirements=init._requirements,
+        )
 
         for u, v, edge in init.edges:
             edge = copy.deepcopy(edge)
@@ -137,12 +163,17 @@ def _reduce_blocksworld(
         nodes[node.label].append(node)
 
     if isinstance(scene, graph.ProblemGraph):
-        reduced = ReducedProblemGraph(constants=scene.constants, domain="blocksworld")
+        reduced = ReducedProblemGraph(
+            constants=scene.constants,
+            domain="blocksworld",
+            requirements=scene._requirements,
+        )
     elif isinstance(scene, graph.SceneGraph):
         reduced = ReducedSceneGraph(
             constants=scene.constants,
             domain="blocksworld",
             scene=scene.scene,
+            requirements=scene._requirements,
         )
     else:
         raise ValueError("Scene must be a SceneGraph or ProblemGraph.")
@@ -204,6 +235,15 @@ def _validate_blocksworld(scene: graph.SceneGraph):
     """
     if not rx.is_directed_acyclic_graph(scene.graph):
         raise ValueError("Scene graph is not a Directed Acyclic Graph.")
+    if scene.scene == graph.Scene.INIT:
+        for node in scene.nodes:
+            if not isinstance(node.node, ReducedNode):
+                if scene.in_degree(node.node) != 1 or scene.out_degree(node.node) != 1:
+                    # only case this is allowed is if the object is in the hand
+                    if not scene.has_edge(node, ReducedNode.ARM):
+                        raise ValueError(
+                            f"Node {node} does not have top or bottom behavior defined."
+                        )
     for node in scene.nodes:
         if (node.node != ReducedNode.TABLE and scene.in_degree(node.node) > 1) or (
             node.node != ReducedNode.CLEAR and scene.out_degree(node.node) > 1
@@ -213,11 +253,7 @@ def _validate_blocksworld(scene: graph.SceneGraph):
             )
         if scene.in_degree(ReducedNode.ARM) == 1:
             obj = scene.predecessors(ReducedNode.ARM)[0]
-            if (
-                obj.node != ReducedNode.CLEAR
-                and scene.in_degree(obj) == 1
-                and scene.predecessors(obj)[0].node != ReducedNode.CLEAR
-            ):
+            if obj.node != ReducedNode.CLEAR and scene.in_degree(obj) > 0:
                 raise ValueError("Object on arm is connected to another object.")
 
 
@@ -240,12 +276,17 @@ def _reduce_gripper(
         nodes[node.label].append(node)
 
     if isinstance(scene, graph.ProblemGraph):
-        reduced = ReducedProblemGraph(constants=scene.constants, domain="gripper")
+        reduced = ReducedProblemGraph(
+            constants=scene.constants,
+            domain="gripper",
+            requirements=scene._requirements,
+        )
     elif isinstance(scene, graph.SceneGraph):
         reduced = ReducedSceneGraph(
             constants=scene.constants,
             domain="gripper",
             scene=scene.scene,
+            requirements=scene._requirements,
         )
     else:
         raise ValueError("Scene must be a SceneGraph or ProblemGraph.")
@@ -276,18 +317,37 @@ def _reduce_gripper(
 
         pred_nodes.add(node)
 
-    if validate:
-        if isinstance(reduced, ReducedProblemGraph):
-            init, goal = reduced.decompose()
-            if not rx.is_directed_acyclic_graph(init.graph):
-                raise ValueError("Initial scene graph is not a Directed Acyclic Graph.")
-            if not rx.is_directed_acyclic_graph(goal.graph):
-                raise ValueError("Goal scene graph is not a Directed Acyclic Graph.")
-        elif isinstance(reduced, ReducedSceneGraph):
-            if not rx.is_directed_acyclic_graph(reduced.graph):
-                raise ValueError("Scene graph is not a Directed Acyclic Graph.")
-
     return reduced
+
+
+def reduce(
+    graph: graph.SceneGraph,
+    domain: str | None = None,
+    validate: bool = True,
+) -> ReducedSceneGraph | ReducedProblemGraph:
+    """Reduces a scene graph to a Directed Acyclic Graph.
+
+    Args:
+        graph (graph.SceneGraph): The scene graph to reduce.
+        domain (str, optional): The domain of the scene graph. Defaults to
+            "blocksworld".
+        validate (bool, optional): Whether or not to validate if the reduced
+            reprsentation is valid and a DAG. Defaults to True.
+
+    Raises:
+        ValueError: If a certain domain is provided but not supported.
+
+    Returns:
+        ReducedGraph: The reduced problem graph.
+    """
+    domain = domain or graph.domain
+    match domain:
+        case "blocksworld":
+            return _reduce_blocksworld(graph, validate=validate)
+        case "gripper":
+            return _reduce_gripper(graph, validate=validate)
+        case _:
+            raise ValueError(f"Domain {domain} not supported.")
 
 
 def _inflate_blocksworld(
@@ -356,6 +416,7 @@ def _inflate_blocksworld(
             [pred for pred in predicates if pred["scene"] == graph.Scene.INIT],
             [pred for pred in predicates if pred["scene"] == graph.Scene.GOAL],
             domain="blocksworld",
+            requirements=scene._requirements,
         )
     else:
         return graph.SceneGraph(
@@ -363,6 +424,7 @@ def _inflate_blocksworld(
             predicates,
             domain="blocksworld",
             scene=scene.scene,
+            requirements=scene._requirements,
         )
 
 
@@ -440,6 +502,7 @@ def _inflate_gripper(
             [pred for pred in predicates if pred["scene"] == graph.Scene.INIT],
             [pred for pred in predicates if pred["scene"] == graph.Scene.GOAL],
             domain="gripper",
+            requirements=scene._requirements,
         )
     else:
         return graph.SceneGraph(
@@ -447,7 +510,32 @@ def _inflate_gripper(
             predicates,
             domain="gripper",
             scene=scene.scene,
+            requirements=scene._requirements,
         )
+
+
+def inflate(
+    scene: ReducedSceneGraph | ReducedProblemGraph,
+    domain: str | None = None,
+) -> graph.SceneGraph:
+    """Inflate a reduced scene graph to a SceneGraph.
+
+    Args:
+        scene (ReducedGraph): The reduced scene graph to respecify.
+        domain (str | None, optional): The domain of the scene graph. Defaults
+            to None.
+
+    Returns:
+        graph.SceneGraph: The respecified, inflated scene graph.
+    """
+    domain = domain or scene._domain
+    match domain:
+        case "blocksworld":
+            return _inflate_blocksworld(scene)
+        case "gripper":
+            return _inflate_gripper(scene)
+        case _:
+            raise ValueError(f"Domain {domain} not supported.")
 
 
 def _blocksworld_underspecified_blocks(
@@ -554,30 +642,6 @@ def _gripper_underspecified_blocks(
         underspecified_grippers,
         goal.out_degree(ReducedNode.ROBBY) == 0,
     )
-
-
-def inflate(
-    scene: ReducedSceneGraph | ReducedProblemGraph,
-    domain: str | None = None,
-) -> graph.SceneGraph:
-    """Inflate a reduced scene graph to a SceneGraph.
-
-    Args:
-        scene (ReducedGraph): The reduced scene graph to respecify.
-        domain (str | None, optional): The domain of the scene graph. Defaults
-            to None.
-
-    Returns:
-        graph.SceneGraph: The respecified, inflated scene graph.
-    """
-    domain = domain or scene._domain
-    match domain:
-        case "blocksworld":
-            return _inflate_blocksworld(scene)
-        case "gripper":
-            return _inflate_gripper(scene)
-        case _:
-            raise ValueError(f"Domain {domain} not supported.")
 
 
 def _detached_blocks(
@@ -743,31 +807,163 @@ def fully_specify(
         )
 
 
-def reduce(
-    graph: graph.SceneGraph,
-    domain: str | None = None,
-    validate: bool = True,
-) -> ReducedSceneGraph | ReducedProblemGraph:
-    """Reduces a scene graph to a Directed Acyclic Graph.
+def _plan_blocksworld(problem: ReducedProblemGraph) -> list[Action]:
+    init, goal = problem.decompose()
+    actions = []
+
+    # Process init scene
+    # check if arm is empty
+    if (
+        not init.has_edge(ReducedNode.CLEAR, ReducedNode.ARM)
+        and init.in_degree(ReducedNode.ARM) == 1
+    ):
+        obj = init.predecessors(ReducedNode.ARM)[0]
+        actions.append(Action("putdown", [obj.name]))
+
+    # unstack everything in init
+    for idx in rx.topological_sort(init.graph):
+        node = init.nodes[idx]
+        if isinstance(node.node, ReducedNode):
+            continue
+        elif init.successors(node)[0].name in (ReducedNode.ARM, ReducedNode.TABLE):
+            # if the block is on the table or in the arm, ignore it
+            continue
+        else:
+            actions.append(
+                Action("unstack", [node.name, init.successors(node)[0].name])
+            )
+            actions.append(Action("putdown", [node.name]))
+
+    # Process goal scene
+    # stack everything in goal
+    for idx in reversed(rx.topological_sort(goal.graph)):
+        node = goal.nodes[idx]
+        if isinstance(node.node, ReducedNode):
+            continue
+        elif goal.out_degree(node.node) == 0:
+            # isn't defined to be on anything (keep on table)
+            continue
+        elif goal.successors(node)[0].node in (ReducedNode.ARM, ReducedNode.TABLE):
+            # if the block is on the table or in the arm, ignore it
+            continue
+        else:
+            actions.append(Action("pickup", [node.name]))
+            actions.append(Action("stack", [node.name, goal.successors(node)[0].name]))
+
+    # Check if arm should be holding it
+    if (
+        not goal.has_edge(ReducedNode.CLEAR, ReducedNode.ARM)
+        and goal.in_degree(ReducedNode.ARM) == 1
+    ):
+        obj = goal.predecessors(ReducedNode.ARM)[0]
+        actions.append(Action("pickup", [obj.name]))
+
+    return actions
+
+
+def _plan_gripper(problem: ReducedProblemGraph) -> list[Action]:
+    # TODO: this function is not "complete": it does not handle all cases
+    # - multiple "types" per object
+    # - robby not at a room (can be valid in a few cases)
+    # - balls not in rooms
+    # - objects without typing
+
+    init, goal = problem.decompose()
+    actions = []
+
+    # Process init scene
+    typed = _gripper_get_typed_objects(init)
+    rooms = list(typed[ReducedNode.ROOMS])
+    grippers = list(typed[ReducedNode.GRIPPERS])
+
+    # get current room
+    if init.out_degree(ReducedNode.ROBBY) < 1:
+        return actions
+
+    current_room = init.successors(ReducedNode.ROBBY)[0]
+    # move to first room
+    if current_room != rooms[0]:
+        actions.append(Action("move", [current_room.name, rooms[0].name]))
+
+    # ensure all grippers are free
+    for gripper in grippers:
+        if not init.has_edge(ReducedNode.FREE, gripper):
+            # get in_edge
+            ball = [
+                b for b in init.predecessors(gripper) if b in typed[ReducedNode.BALLS]
+            ]
+            if ball:
+                actions.append(
+                    Action("drop", [ball[0].name, rooms[0].name, gripper.name])
+                )
+
+    # move all balls to first room
+    for room in rooms:
+        for obj in init.predecessors(room):
+            if obj in typed[ReducedNode.BALLS]:
+                actions.append(Action("move", [rooms[0].name, room.name]))
+                actions.append(Action("pick", [obj.name, room.name, grippers[0].name]))
+                actions.append(Action("move", [room.name, rooms[0].name]))
+                actions.append(
+                    Action("drop", [obj.name, rooms[0].name, grippers[0].name])
+                )
+
+    # Process goal scene
+    for room in rooms:
+        for obj in goal.predecessors(room):
+            if obj in typed[ReducedNode.BALLS]:
+                actions.append(
+                    Action("pick", [obj.name, rooms[0].name, grippers[0].name])
+                )
+                actions.append(Action("move", [rooms[0].name, room.name]))
+                actions.append(Action("drop", [obj.name, room.name, grippers[0].name]))
+                actions.append(Action("move", [room.name, rooms[0].name]))
+
+    # pick up balls in first room tied to grippers
+    for gripper in grippers:
+        for ball in typed[ReducedNode.BALLS]:
+            if goal.has_edge(ball, gripper):
+                actions.append(Action("pick", [ball.name, rooms[0].name, gripper.name]))
+
+    # move to room with robby
+    goal_room = next(iter(goal.successors(ReducedNode.ROBBY)), None)
+    if goal_room:
+        actions.append(Action("move", [rooms[0].name, goal_room.name]))
+
+    return actions
+
+
+def plan(problem: graph.ProblemGraph, domain: str | None = None) -> list[Action]:
+    """Plans a sequence of actions to solve a problem.
 
     Args:
-        graph (graph.SceneGraph): The scene graph to reduce.
-        domain (str, optional): The domain of the scene graph. Defaults to
-            "blocksworld".
-        validate (bool, optional): Whether or not to validate if the reduced
-            reprsentation is valid and a DAG. Defaults to True.
-
-    Raises:
-        ValueError: If a certain domain is provided but not supported.
+        problem (graph.ProblemGraph): The problem to plan for.
 
     Returns:
-        ReducedGraph: The reduced problem graph.
+        str: The sequence of actions to solve the problem.
     """
-    domain = domain or graph.domain
+    domain = domain or problem.domain
+    try:
+        problem = fully_specify(problem, domain=domain, return_reduced=True)
+    except Exception:
+        return []
+
     match domain:
         case "blocksworld":
-            return _reduce_blocksworld(graph, validate=validate)
+            return _plan_blocksworld(problem)
         case "gripper":
-            return _reduce_gripper(graph, validate=validate)
+            return _plan_gripper(problem)
         case _:
             raise ValueError(f"Domain {domain} not supported.")
+
+
+def plan_to_string(actions: list[Action]) -> str:
+    """Converts a list of actions to a string.
+
+    Args:
+        actions (list[Action]): The list of actions to convert.
+
+    Returns:
+        str: The string representation of the actions.
+    """
+    return plan_template.render(actions=actions)

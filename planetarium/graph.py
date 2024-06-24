@@ -87,7 +87,6 @@ class PlanGraph(metaclass=abc.ABCMeta):
 
     Attributes:
         constants (property): A dictionary of constant nodes in the scene graph.
-        predicates (property): A dictionary of predicate nodes in the scene graph.
         domain (property): The domain of the scene graph.
     """
 
@@ -95,6 +94,7 @@ class PlanGraph(metaclass=abc.ABCMeta):
         self,
         constants: list[dict[str, Any]],
         domain: str | None = None,
+        requirements: tuple[str] = (),
     ):
         """
         Initialize the SceneGraph instance.
@@ -103,10 +103,13 @@ class PlanGraph(metaclass=abc.ABCMeta):
             constants (list): List of dictionaries representing constants.
             domain (str, optional): The domain of the scene graph.
                 Defaults to None.
+            requirements (list, optional): List of requirements for the scene
+                graph.
         """
         super().__init__()
 
         self._domain = domain
+        self._requirements = requirements
         self.graph = rx.PyDiGraph()
 
         for constant in constants:
@@ -253,7 +256,7 @@ class PlanGraph(metaclass=abc.ABCMeta):
         else:
             succs = self.graph.successors(self._node_lookup[node][0])
 
-        return [self.nodes[succ] for succ in succs]
+        return succs
 
     def in_edges(
         self, node: str | PlanGraphNode
@@ -358,6 +361,7 @@ class PlanGraph(metaclass=abc.ABCMeta):
             and set(self.nodes) == set(other.nodes)
             and set(self.edges) == set(other.edges)
             and self.domain == other.domain
+            and set(self._requirements) == set(other._requirements)
         )
 
 
@@ -367,7 +371,6 @@ class SceneGraph(PlanGraph):
 
     Attributes:
         constants (property): A dictionary of constant nodes in the scene graph.
-        predicates (property): A dictionary of predicate nodes in the scene graph.
         domain (property): The domain of the scene graph.
     """
 
@@ -377,6 +380,7 @@ class SceneGraph(PlanGraph):
         predicates: list[dict[str, Any]],
         domain: str | None = None,
         scene: Scene | None = None,
+        requirements: tuple[str] = (),
     ):
         """
         Initialize the SceneGraph instance.
@@ -387,9 +391,12 @@ class SceneGraph(PlanGraph):
             domain (str, optional): The domain of the scene graph.
                 Defaults to None.
             scene (str, optional): The scene of the scene graph.
+                Defaults to None.
+            requirements (list, optional): List of requirements for the scene
+                graph.
         """
 
-        super().__init__(constants, domain=domain)
+        super().__init__(constants, domain=domain, requirements=requirements)
 
         self.scene = scene
 
@@ -405,7 +412,6 @@ class ProblemGraph(PlanGraph):
         constants (property): A dictionary of constant nodes in the scene graph.
         init_predicates (property): A dictionary of predicate nodes in the initial scene graph.
         goal_predicates (property): A dictionary of predicate nodes in the goal scene graph.
-
     """
 
     def __init__(
@@ -414,6 +420,7 @@ class ProblemGraph(PlanGraph):
         init_predicates: list[dict[str, Any]],
         goal_predicates: list[dict[str, Any]],
         domain: str | None = None,
+        requirements: tuple[str] = (),
     ):
         """
         Initialize the ProblemGraph instance.
@@ -427,7 +434,7 @@ class ProblemGraph(PlanGraph):
             domain (str, optional): The domain of the scene graph.
                 Defaults to None.
         """
-        super().__init__(constants, domain=domain)
+        super().__init__(constants, domain=domain, requirements=requirements)
 
         for scene, predicates in (
             (Scene.INIT, init_predicates),
@@ -523,8 +530,6 @@ class ProblemGraph(PlanGraph):
 
         return predicates
 
-
-
     @cached_property
     def _decompose(self) -> tuple[SceneGraph, SceneGraph]:
         """
@@ -539,6 +544,7 @@ class ProblemGraph(PlanGraph):
             predicates=self.init_predicates,
             domain=self.domain,
             scene=Scene.INIT,
+            requirements=self._requirements,
         )
 
         goal_scene = SceneGraph(
@@ -546,6 +552,7 @@ class ProblemGraph(PlanGraph):
             predicates=self.goal_predicates,
             domain=self.domain,
             scene=Scene.GOAL,
+            requirements=self._requirements,
         )
 
         return init_scene, goal_scene
@@ -577,4 +584,5 @@ class ProblemGraph(PlanGraph):
             init_predicates=init.predicates,
             goal_predicates=goal.predicates,
             domain=init.domain,
+            requirements=init._requirements,
         )

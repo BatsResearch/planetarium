@@ -94,4 +94,5 @@ def build(problem: str) -> ProblemGraph:
         _build_predicates(problem.init),
         _build_predicates(goal),
         domain=problem.domain_name,
+        requirements=[req.name for req in problem.requirements],
     )
