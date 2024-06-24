@@ -136,6 +136,10 @@ class ReducedProblemGraph(graph.PlanGraph):
         return problem
 
 
+class DomainNotSupportedError(Exception):
+    pass
+
+
 def _reduce_blocksworld(
     scene: graph.SceneGraph | graph.ProblemGraph,
     validate: bool = True,
@@ -347,7 +351,7 @@ def reduce(
         case "gripper":
             return _reduce_gripper(graph, validate=validate)
         case _:
-            raise ValueError(f"Domain {domain} not supported.")
+            raise DomainNotSupportedError(f"Domain {domain} not supported.")
 
 
 def _inflate_blocksworld(
@@ -535,7 +539,7 @@ def inflate(
         case "gripper":
             return _inflate_gripper(scene)
         case _:
-            raise ValueError(f"Domain {domain} not supported.")
+            raise DomainNotSupportedError(f"Domain {domain} not supported.")
 
 
 def _blocksworld_underspecified_blocks(
@@ -795,7 +799,7 @@ def fully_specify(
                 reduced_goal,
             )
         case _:
-            raise ValueError(f"Domain {domain} not supported.")
+            raise DomainNotSupportedError(f"Domain {domain} not supported.")
 
     if return_reduced:
         return ReducedProblemGraph.join(reduced_init, fully_specified_goal)
@@ -954,7 +958,7 @@ def plan(problem: graph.ProblemGraph, domain: str | None = None) -> list[Action]
         case "gripper":
             return _plan_gripper(problem)
         case _:
-            raise ValueError(f"Domain {domain} not supported.")
+            raise DomainNotSupportedError(f"Domain {domain} not supported.")
 
 
 def plan_to_string(actions: list[Action]) -> str:
