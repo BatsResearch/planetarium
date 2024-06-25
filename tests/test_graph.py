@@ -47,3 +47,10 @@ class TestGraph:
                     assert True
                 case _:
                     assert False
+
+    def test_plot(self, sgraph):
+        """
+        Test if the graph can be plotted.
+        """
+        sgraph.plot()
+        assert True

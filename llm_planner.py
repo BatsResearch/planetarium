@@ -9,11 +9,10 @@ from transformers import (
     PreTrainedModel,
 )
 
-# from vllm import LLM, RequestOutput, SamplingParams
+from vllm import LLM, RequestOutput, SamplingParams
 
 
 class PlanningProblem:
-
     def __init__(
         self,
         natural_language: str,
@@ -32,25 +31,60 @@ class PlanningProblem:
         self.domain = domain
         self.problem = problem
 
+    def apply_template(
+        self,
+        domain_prompt: str = "",
+        problem_prompt: str = "",
+        include_answer: bool = True,
+    ) -> list[dict[str, str]]:
+        """Apply problem template to the problem.
+
+        Args:
+            domain_prompt (str, optional): How to prompt the domain. Defaults to "".
+            problem_prompt (str, optional): How to prompt the problem. Defaults to "".
+            include_answer (bool, optional): Whether to include the answer. Defaults to True.
+
+        Returns:
+            list[dict[str, str]]: Problem prompt.
+        """
+        return [
+            {
+                "role": "user",
+                "content": f"{problem_prompt} {self.natural_language} "
+                + f"{domain_prompt}\n{self.domain}\n",
+            },
+        ] + (
+            [
+                {
+                    "role": "assistant",
+                    "content": " " + self.problem,
+                },
+            ]
+            if include_answer
+            else []
+        )
+
 
 class Planner(abc.ABC):
-
     @abc.abstractmethod
     def plan_chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[list[dict[str, str]]],
         device=None,
+        max_new_tokens: int = 8_000,
         **kwargs,
-    ) -> str:
+    ) -> list[str]:
         """Passes messages to a model for completion.
 
         Args:
-            messages (list[dict[str, str]]): A list of messages to be passed to
-                the model.
+            messages (list[list[dict[str, str]]]): A list of messages to be
+                passed to the model.
             device (optional): The device to run the model on. Defaults to None.
+            max_new_tokens (int): The maximum number of tokens to generate.
+                Defaults to 8_000.
 
         Returns:
-            str: The message completion.
+            list[str]: The message completion.
         """
         pass
 
@@ -114,7 +148,7 @@ class HFPlanner:
         messages: list[dict[str, str]],
         device=None,
         **kwargs,
-    ) -> str:
+    ) -> list[str]:
         """Passes messages to the model for completion, applying a chat template.
 
         Args:
@@ -171,10 +205,9 @@ class VLLMPlanner(Planner):
 
     def plan_chat(
         self,
-        prompts: list[list[dict[str, str]]],
+        messages: list[list[dict[str, str]]],
         device=None,
         max_new_tokens: int = 8_000,
-        use_tqdm=False,
         **kwargs,
     ) -> list[str]:
         """Passes messages to the model for completion.
@@ -182,28 +215,27 @@ class VLLMPlanner(Planner):
         Args:
             messages (list[dict[str, str]]): A list of messages to be passed to
                 the model.
-            use_tqdm (bool): Whether to use tqdm for progress tracking. Defaults
-                to False.
 
         Returns:
             list[str]: The message completions.
         """
         encoded = self.tokenizer.apply_chat_template(
-            prompts,
+            messages,
             add_generation_prompt=True,
             tokenize=False,
         )
-        generate_config = {  # default generate config
-            "max_tokens": max_new_tokens,
-            "temperature": 0.0,
-        }
-        generate_config.update(kwargs)
-        params = SamplingParams(**generate_config)
+        params = SamplingParams(
+            max_tokens=max_new_tokens,
+            temperature=kwargs.get("temperature", 0.0),
+            top_p=kwargs.get("top_p", 1.0),
+            top_k=kwargs.get("top_k", -1),
+            min_p=kwargs.get("min_p", 0.0),
+        )
 
         outputs: list[RequestOutput] = self.model.generate(
             encoded,
             params,
-            use_tqdm=use_tqdm,
+            use_tqdm=False,
         )
 
         return [output.outputs[0].text for output in outputs]
@@ -223,7 +255,7 @@ class OpenAIPlanner:
         self.client = OpenAI(**kwargs)
         self.model_name = model_name
 
-    def plan_chat(
+    def _plan_chat(
         self,
         messages: list[dict[str, str]],
         max_new_tokens: int | None = None,
@@ -240,18 +272,45 @@ class OpenAIPlanner:
         Returns:
             str: The message completion.
         """
-        generate_config = {  # default generate config
-            "max_tokens": max_new_tokens,
-            "temperature": 0.0,
-        }
-        generate_config.update(kwargs)
 
         return (
             self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
-                **generate_config,
+                frequency_penalty=kwargs.get("frequency_penalty", None),
+                max_tokens=max_new_tokens,
+                n=1,
+                presence_penalty=kwargs.get("presence_penalty", None),
+                temperature=kwargs.get("temperature", 0.0),
+                top_p=kwargs.get("top_p", None),
             )
             .choices[0]
             .message.content
         )
+
+    def plan_chat(
+        self,
+        messages: list[list[dict[str, str]]],
+        max_new_tokens: int | None = None,
+        device=None,
+        **kwargs,
+    ) -> list[str]:
+        """Passes messages to the model for completion.
+
+        Args:
+            messages (list[list[dict[str, str]]]): A list of messages to be
+                passed to the model.
+            device (optional): The device to run the model on (ignored for OpenAI).
+
+        Returns:
+            list[str]: The message completions.
+        """
+        return [
+            self._plan_chat(
+                message,
+                max_new_tokens=max_new_tokens,
+                device=device,
+                **kwargs,
+            )
+            for message in messages
+        ]

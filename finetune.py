@@ -26,7 +26,6 @@ from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 import tqdm as tqdm
 
 import llm_planner as llmp
-from utils import apply_template
 
 from accelerate import Accelerator
 
@@ -137,8 +136,7 @@ def preprocess(
     inputs = [
         strip(
             tokenizer.apply_chat_template(
-                apply_template(
-                    llmp.PlanningProblem(nl, d, p),
+                    llmp.PlanningProblem(nl, d, p).apply_template(
                     domain_prompt,
                     problem_prompt,
                 ),

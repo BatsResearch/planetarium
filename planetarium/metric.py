@@ -1,6 +1,5 @@
 import functools
 import rustworkx as rx
-import typing
 
 from planetarium import graph
 
@@ -49,7 +48,7 @@ def _same_typing(source: graph.PlanGraphNode, target: graph.PlanGraphNode) -> bo
 def _node_matching(
     source: graph.PlanGraphNode,
     target: graph.PlanGraphNode,
-    mapping: typing.Optional[dict],
+    mapping: dict | None,
 ) -> bool:
     """
     Check if two nodes match based on their labels, positions, and typings.
@@ -57,7 +56,7 @@ def _node_matching(
     Parameters:
         source (graph.PlanGraphNode): The source node.
         target (graph.PlanGraphNode): The target node.
-        mapping (Optional[dict]): The mapping between node names.
+        mapping (dict | None): The mapping between node names.
 
     Returns:
         bool: True if nodes match, False otherwise.
@@ -103,7 +102,7 @@ def _edge_matching(
 def isomorphic(
     source: graph.ProblemGraph | graph.SceneGraph,
     target: graph.ProblemGraph | graph.SceneGraph,
-    mapping: typing.Optional[dict] = None,
+    mapping: dict | None = None,
 ) -> bool:
     """
     Find all valid isomorphic mappings between nodes of two scene graphs.
@@ -111,7 +110,7 @@ def isomorphic(
     Parameters:
         source (ProblemGraph): The source problem graph.
         target (ProblemGraph): The target problem graph.
-        mapping (Optional[dict]): The initial mapping between node names.
+        mapping (dict | None): The initial mapping between node names.
 
     Returns:
         bool: True if there is a valid mapping, False otherwise.

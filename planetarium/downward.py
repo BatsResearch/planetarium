@@ -7,18 +7,29 @@ import subprocess
 import tempfile
 
 
-def _get_best_plan(plan_filepath: str) -> tuple[str, float]:
+def _get_best_plan(plan_filepath: str) -> tuple[str | None, float]:
+    """Get the best plan from a FastDownward plan file.
+
+    Args:
+        plan_filepath (str): The path to the plan file.
+
+    Returns:
+        The best plan and its cost.
+    """
+
     best_cost = float("inf")
     best_plan = None
 
     for plan_fp in glob.glob(f"{plan_filepath}.*"):
         with open(plan_fp, "r") as f:
             *pddl_plan, cost_str = f.readlines()
-            cost = float(re.search(r"cost = ([-\d\.]+)", cost_str).group(1))
+            match = re.search(r"cost = ([-\d\.]+)", cost_str)
+            if match:
+                cost = float(match.group(1))
 
-            if cost < best_cost:
-                best_cost = cost
-                best_plan = "\n".join([*pddl_plan, ";"])
+                if cost < best_cost:
+                    best_cost = cost
+                    best_plan = "\n".join([*pddl_plan, ";"])
     return best_plan, best_cost
 
 
@@ -28,7 +39,7 @@ def plan(
     downward: str = "downward",
     alias: str = "lama",
     **kwargs,
-) -> tuple[str | None, int]:
+) -> tuple[str | None, float]:
     """Find plan using FastDownward.
 
     Args:

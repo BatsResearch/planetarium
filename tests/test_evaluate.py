@@ -21,6 +21,7 @@ class TestEvaluate:
         blocksworld_missing_clears,
         blocksworld_fully_specified,
         blocksworld_missing_ontables,
+        blocksworld_underspecified,
     ):
         """
         Test if the evaluation of PDDL problem descriptions is correct.
@@ -33,6 +34,9 @@ class TestEvaluate:
         for (name1, desc1), (name2, desc2) in product(descs, descs):
             with subtests.test(f"{name1} equals {name2}"):
                 assert all(evaluate.evaluate(desc1, desc2))
+
+        with subtests.test("blocksworld_underspecified equals blocksworld_underspecified"):
+            assert all(evaluate.evaluate(blocksworld_underspecified, blocksworld_underspecified))
 
     def test_evaluate_inequivalent(
         self,

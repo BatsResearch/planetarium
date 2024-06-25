@@ -154,7 +154,7 @@ class DatasetGenerator(abc.ABC):
         init: str,
         goal: str,
         *args,
-    ) -> tuple[Problem, dict[str, dict[str, str]], dict[str]]:
+    ) -> tuple[Problem, dict[str, dict[str, str]], dict[str, int | float | str]]:
         """Generate a task.
 
         Args:
@@ -257,6 +257,7 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
                 if num_blocks % height == 0:
                     num_blocks = [height] * (num_blocks // height)
                     return num_blocks
+            return num_blocks
 
         if isinstance(num_blocks, int):
             num_blocks = _get_height(num_blocks)
