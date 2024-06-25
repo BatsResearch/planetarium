@@ -12,28 +12,30 @@ readme = "README.md"
 python = "^3.10"
 networkx = "^3.2.1"
 pddl = {git = "https://github.com/maxzuo/pddl.git"}
-numpy = "^1.26.2"
-scipy = "^1.11.4"
-vllm = "^0.5.0.post1"
-matplotlib = "^3.9.0"
-python-dotenv = "^1.0.1"
 pyyaml = "^6.0.1"
 jinja2 = "^3.1.4"
-lark = "^1.1.9"
-datasets = "^2.20.0"
-peft = "^0.11.1"
-trl = "^0.9.4"
-bitsandbytes = "^0.43.1"
 rustworkx = "^0.14.2"
+matplotlib = "^3.9.0"
 
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.1.7"
 pytest = "^7.4.3"
 mypy = "^1.7.1"
-black = {extras = ["jupyter"], version = "^23.11.0"}
 pytest-cov = "^4.1.0"
 pytest-timeout = "^2.2.0"
+black = {extras = ["jupyter"], version = "^24.4.2"}
+
+
+[tool.poetry.group.all.dependencies]
+lark = "^1.1.9"
+vllm = "^0.5.0.post1"
+python-dotenv = "^1.0.1"
+datasets = "^2.20.0"
+peft = "^0.11.1"
+trl = "^0.9.4"
+bitsandbytes = "^0.43.1"
+openai = "^1.35.3"
 
 [build-system]
 requires = ["poetry-core"]

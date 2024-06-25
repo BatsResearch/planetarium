@@ -31,6 +31,39 @@ class PlanningProblem:
         self.domain = domain
         self.problem = problem
 
+    def apply_template(
+        self,
+        domain_prompt: str = "",
+        problem_prompt: str = "",
+        include_answer: bool = True,
+    ) -> list[dict[str, str]]:
+        """Apply problem template to the problem.
+
+        Args:
+            domain_prompt (str, optional): How to prompt the domain. Defaults to "".
+            problem_prompt (str, optional): How to prompt the problem. Defaults to "".
+            include_answer (bool, optional): Whether to include the answer. Defaults to True.
+
+        Returns:
+            list[dict[str, str]]: Problem prompt.
+        """
+        return [
+            {
+                "role": "user",
+                "content": f"{problem_prompt} {self.natural_language} "
+                + f"{domain_prompt}\n{self.domain}\n",
+            },
+        ] + (
+            [
+                {
+                    "role": "assistant",
+                    "content": " " + self.problem,
+                },
+            ]
+            if include_answer
+            else []
+        )
+
 
 class Planner(abc.ABC):
     @abc.abstractmethod
