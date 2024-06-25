@@ -1,6 +1,6 @@
-# planetarium
+# planetarium🪐
 
-Planetarium is a benchmark for assessing LLMs in translating natural language descriptions of planning problems into PDDL.
+Planetarium🪐 is a [dataset](https://huggingface.co/datasets/BatsResearch/planetarium) and benchmark for assessing LLMs in translating natural language descriptions of planning problems into PDDL. We developed a robust method for comparing PDDL problem descriptions using graph isomorphism.
 
 ## Installation
 To install the `planetarium` package, you can use the following command:
@@ -37,3 +37,41 @@ from planetarium import evaluate
 evaluate.evaluate(gt_pddl_str, pred_pddl_str)
 ```
 The supported domains are `blocksworld` and `gripper` domains.
+
+## Dataset
+The main page for the dataset can be found [here](https://huggingface.co/datasets/BatsResearch/planetarium).
+
+Here is an example of how to load the dataset:
+```python
+from datasets import load_dataset
+
+dataset = load_dataset("BatsResearch/planetarium")
+```
+
+You can reporduce the dataset, the splits, and a report by running the following command:
+```bash
+python dataset_generator.py -c dataset_config.yaml
+```
+
+By modifying the `dataset_config.yaml` file, you can change the dataset splits, the number of samples, and produce even more examples!
+
+Here is a summary of the types of PDDL problems in the dataset:
+
+### Dataset Report
+Total number of problems: $132,037$.
+
+#### Abstractness Split
+| Init | Goal | blocksworld | gripper |
+|:---:|:---:|---:|---:|
+| abstract | abstract | $23,144$ | $10,632$ |
+| abstract | explicit | $23,086$ | $9,518$ |
+| explicit | abstract | $23,087$ | $10,313$ |
+| explicit | explicit | $23,033$ | $9,224$ |
+#### Size Splits (Number of Propositions in Ground Truth)
+| Num. of Propositions | blocksworld | gripper |
+|:---:|---:|---:|
+| $0$-$20$ | $1,012$ | $379$ |
+| $20$-$40$ | $10,765$ | $2,112$ |
+| $40$-$60$ | $50,793$ | $9,412$ |
+| $60$-$80$ | $26,316$ | $25,346$ |
+| $80$-inf | $3,464$ | $2,438$ |

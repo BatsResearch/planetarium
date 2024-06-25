@@ -4,6 +4,8 @@ import abc
 import enum
 from functools import cached_property
 
+import matplotlib.pyplot as plt
+import networkx as nx
 import rustworkx as rx
 
 
@@ -360,6 +362,40 @@ class PlanGraph(metaclass=abc.ABCMeta):
             and self.domain == other.domain
         )
 
+    def plot(self, fig: plt.Figure | None = None) -> plt.Figure:
+        """Generate a plot of the graph, sorted by topological generation.
+
+        Args:
+            fig (plt.Figure | None, optional): The figure to plot on. Defaults
+                to None.
+
+        Returns:
+            plt.Figure: The figure containing the plot.
+        """
+        # rx has no plotting functionality
+        nx_graph = nx.MultiDiGraph()
+        nx_graph.add_edges_from(
+            [(u.node, v.node, {"data": edge}) for u, v, edge in self.edges]
+        )
+
+        for layer, nodes in enumerate(nx.topological_generations(nx_graph)):
+            for node in nodes:
+                nx_graph.nodes[node]["layer"] = layer
+
+        pos = nx.multipartite_layout(
+            nx_graph,
+            align="horizontal",
+            subset_key="layer",
+            scale=-1,
+        )
+
+        if fig is None:
+            fig = plt.figure()
+
+        nx.draw(nx_graph, pos=pos, ax=fig.gca(), with_labels=True)
+
+        return fig
+
 
 class SceneGraph(PlanGraph):
     """
@@ -522,8 +558,6 @@ class ProblemGraph(PlanGraph):
             )
 
         return predicates
-
-
 
     @cached_property
     def _decompose(self) -> tuple[SceneGraph, SceneGraph]:

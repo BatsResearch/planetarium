@@ -17,8 +17,6 @@ import torch
 from planetarium import builder, graph, metric, oracle
 import llm_planner as llmp
 
-from utils import apply_template
-
 HF_USER_TOKEN = os.getenv("HF_USER_TOKEN")
 
 
@@ -82,8 +80,7 @@ def plan(
     context = []
     for example_problem in example_problems:
         context.extend(
-            apply_template(
-                example_problem,
+            example_problem.apply_template(
                 domain_prompt,
                 problem_prompt,
             )
@@ -91,8 +88,7 @@ def plan(
 
     if isinstance(problem, llmp.PlanningProblem):
         messages = [
-            apply_template(
-                problem,
+            problem.apply_template(
                 domain_prompt,
                 problem_prompt,
                 include_answer=False,
@@ -100,8 +96,7 @@ def plan(
         ]
     else:
         messages = [
-            apply_template(
-                p,
+            p.apply_template(
                 domain_prompt,
                 problem_prompt,
                 include_answer=False,
