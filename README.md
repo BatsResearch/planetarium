@@ -1,5 +1,7 @@
 # planetarium🪐
-
+<p align="center">
+    <a href="https://arxiv.org/abs/xxxx.xxxxx"><img src="https://badgen.net/static/arxiv/xxxx.xxxxx/blue" /></a>
+</p>
 Planetarium🪐 is a [dataset](https://huggingface.co/datasets/BatsResearch/planetarium) and benchmark for assessing LLMs in translating natural language descriptions of planning problems into PDDL. We developed a robust method for comparing PDDL problem descriptions using graph isomorphism.
 
 ## Installation
