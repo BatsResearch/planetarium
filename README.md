@@ -55,9 +55,9 @@ python dataset_generator.py -c dataset_config.yaml
 
 By modifying the `dataset_config.yaml` file, you can change the dataset splits, the number of samples, and produce even more examples!
 
+### Dataset Report
 Here is a summary of the types of PDDL problems in the dataset:
 
-### Dataset Report
 Total number of problems: $132,037$.
 
 #### Abstractness Split
@@ -70,8 +70,8 @@ Total number of problems: $132,037$.
 #### Size Splits (Number of Propositions in Ground Truth)
 | Num. of Propositions | blocksworld | gripper |
 |:---:|---:|---:|
-| $0$-$20$ | $1,012$ | $379$ |
-| $20$-$40$ | $10,765$ | $2,112$ |
-| $40$-$60$ | $50,793$ | $9,412$ |
-| $60$-$80$ | $26,316$ | $25,346$ |
-| $80$-inf | $3,464$ | $2,438$ |
+| $0$ - $20$ | $1,012$ | $379$ |
+| $20$ - $40$ | $10,765$ | $2,112$ |
+| $40$ - $60$ | $50,793$ | $9,412$ |
+| $60$ - $80$ | $26,316$ | $25,346$ |
+| $80$ - inf | $3,464$ | $2,438$ |
