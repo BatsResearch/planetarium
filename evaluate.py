@@ -200,8 +200,8 @@ def fast_equivalence(
         parseable = True
 
         # reduce and further validate the LLM output
-        oracle.reduce(llm_problem_graph.decompose()[0], validate=True)
-        oracle.reduce(llm_problem_graph.decompose()[1], validate=True)
+        oracle.reduce(llm_problem_graph.init())
+        oracle.reduce(llm_problem_graph.goal())
         valid = True
 
         problem_graph = builder.build(problem_pddl)

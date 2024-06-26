@@ -243,6 +243,7 @@ class TestMetrics:
 
     def test_blocksworld_equivalence(
         self,
+        subtests,
         blocksworld_fully_specified,
         blocksworld_missing_clears,
         blocksworld_missing_ontables,
@@ -259,29 +260,30 @@ class TestMetrics:
         p3 = oracle.fully_specify(p3)
         p4 = oracle.fully_specify(p4)
 
+        P = (
+            ("blocksworld_fully_specified", p1),
+            ("blocksworld_missing_clears", p2),
+            ("blocksworld_missing_ontables", p3),
+            ("blocksworld_underspecified", p4),
+        )
+
         # equivalence to itself
-        assert metric.equals(p1, p1, is_placeholder=True)
-        assert metric.equals(p2, p2, is_placeholder=True)
-        assert metric.equals(p3, p3, is_placeholder=True)
-        assert metric.equals(p4, p4, is_placeholder=True)
-
-        assert metric.equals(p1, p1, is_placeholder=False)
-        assert metric.equals(p2, p2, is_placeholder=False)
-        assert metric.equals(p3, p3, is_placeholder=False)
-        assert metric.equals(p4, p4, is_placeholder=False)
+        for name, p in P:
+            with subtests.test(f"{name} equals {name}"):
+                assert metric.equals(p, p, is_placeholder=True)
+                assert metric.equals(p, p, is_placeholder=False)
 
         # check invalid equivalence
 
         # check invalid equivalence
-        assert not metric.equals(p1, p4, is_placeholder=True)
-        assert not metric.equals(p1, p4, is_placeholder=False)
-        assert not metric.equals(p4, p1, is_placeholder=True)
-        assert not metric.equals(p4, p1, is_placeholder=False)
-        assert not metric.equals(p2, p4, is_placeholder=True)
-        assert not metric.equals(p2, p4, is_placeholder=False)
-        assert not metric.equals(p4, p2, is_placeholder=True)
-        assert not metric.equals(p4, p2, is_placeholder=False)
-        assert not metric.equals(p3, p4, is_placeholder=True)
-        assert not metric.equals(p3, p4, is_placeholder=False)
-        assert not metric.equals(p4, p3, is_placeholder=True)
-        assert not metric.equals(p4, p3, is_placeholder=False)
+        for idx1, idx2 in (
+            (0, 3),
+            (1, 3),
+            (2, 3),
+        ):
+            (name1, p1), (name2, p2) = P[idx1], P[idx2]
+            with subtests.test(f"{name1} not equals {name2}"):
+                assert not metric.equals(p1, p2, is_placeholder=True)
+                assert not metric.equals(p1, p2, is_placeholder=False)
+                assert not metric.equals(p2, p1, is_placeholder=True)
+                assert not metric.equals(p2, p1, is_placeholder=False)

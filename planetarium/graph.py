@@ -110,8 +110,15 @@ class PlanGraph(metaclass=abc.ABCMeta):
         """
         super().__init__()
 
-        self._domain = domain
-        self._requirements = requirements
+        self._constants: list[dict[str, Any]] = []
+        self._constant_nodes: list[PlanGraphNode] = []
+        self._predicates: list[dict[str, Any]] = []
+        self._predicate_nodes: list[PlanGraphNode] = []
+        self._node_lookup: dict[str, tuple[int, PlanGraphNode]] = {}
+        self._nodes: list[PlanGraphNode] = []
+        self._edges: set[tuple[int, int, PlanGraphEdge]] = set()
+        self._domain: str = domain
+        self._requirements: tuple[str] = requirements
         self.graph = rx.PyDiGraph()
 
         for constant in constants:
@@ -124,35 +131,27 @@ class PlanGraph(metaclass=abc.ABCMeta):
                 )
             )
 
-    @property
-    def _node_lookup(self) -> dict[str, tuple[int, PlanGraphNode]]:
-        return {node.node: (index, node) for index, node in enumerate(self.nodes)}
-
     @cached_property
     def nodes(self) -> list[PlanGraphNode]:
-        return self.graph.nodes()
+        return self._nodes
 
     @cached_property
     def edges(self) -> set[tuple[PlanGraphNode, PlanGraphNode, PlanGraphEdge]]:
-        return [
-            (self.nodes[u], self.nodes[v], data)
-            for u, v, data in self.graph.edge_index_map().values()
-        ]
+        return self._edges
 
     def add_node(self, node: PlanGraphNode):
         if node in self.nodes:
             raise ValueError(f"Node {node} already exists in the graph.")
-        self.graph.add_node(node)
+        index = self.graph.add_node(node)
 
         if node.label == Label.CONSTANT:
-            self.__dict__.pop("constant_nodes", None)
-            self.__dict__.pop("constants", None)
+            self._constants.append({"name": node.name, "typing": node.typing})
+            self._constant_nodes.append(node)
         elif node.label == Label.PREDICATE:
-            self.__dict__.pop("predicate_nodes", None)
-            self.__dict__.pop("predicates", None)
+            self._predicate_nodes.append(node)
 
-        self.__dict__.pop("nodes", None)
-        self.__dict__.pop("_node_lookup", None)
+        self._nodes.append(node)
+        self._node_lookup[node.node] = (index, node)
 
     def has_edge(
         self,
@@ -181,17 +180,15 @@ class PlanGraph(metaclass=abc.ABCMeta):
         if isinstance(u, PlanGraphNode):
             u_index = self.nodes.index(u)
         else:
-            u_index, _ = self._node_lookup[u]
+            u_index, u = self._node_lookup[u]
 
         if isinstance(v, PlanGraphNode):
             v_index = self.nodes.index(v)
         else:
-            v_index, _ = self._node_lookup[v]
+            v_index, v = self._node_lookup[v]
 
         self.graph.add_edge(u_index, v_index, edge)
-
-        self.__dict__.pop("edges", None)
-        self.__dict__.pop("predicates", None)
+        self._edges.add((u, v, edge))
 
     def _add_predicate(
         self,
@@ -205,6 +202,7 @@ class PlanGraph(metaclass=abc.ABCMeta):
             predicate (dict): A dictionary representing the predicate.
             scene (Scene, optional): The scene in which the predicate occurs.
         """
+        predicate.update({"scene": scene})
         predicate_name = self._build_unique_predicate_name(
             predicate_name=predicate["typing"],
             argument_names=predicate["parameters"],
@@ -231,6 +229,8 @@ class PlanGraph(metaclass=abc.ABCMeta):
                     scene=scene,
                 ),
             )
+
+        self._predicates.append(predicate)
 
     def in_degree(self, node: str | PlanGraphNode) -> int:
         if isinstance(node, PlanGraphNode):
@@ -314,39 +314,24 @@ class PlanGraph(metaclass=abc.ABCMeta):
         Returns:
             list[PlanGraphNode]: A list of constant nodes.
         """
-        return [node for node in self.nodes if node.label == Label.CONSTANT]
+        return self._constant_nodes
 
-    @cached_property
+    @property
     def constants(self) -> list[dict[str, Any]]:
-        return [
-            {"name": constant.name, "typing": constant.typing}
-            for constant in self.constant_nodes
-        ]
+        return self._constants
 
-    @cached_property
+    @property
     def predicate_nodes(self) -> list[PlanGraphNode]:
         """Get a list of predicate nodes in the scene graph.
 
         Returns:
             list[PlanGraphNode]: A list of predicate nodes.
         """
-        return [node for node in self.nodes if node.label == Label.PREDICATE]
+        return self._predicate_nodes
 
     @property
     def predicates(self) -> list[dict[str, Any]]:
-        predicates = []
-        for node in self.predicate_nodes:
-            edges = self.out_edges(node)
-            edges.sort(key=lambda x: x[1].position)
-            predicates.append(
-                {
-                    "typing": node.typing,
-                    "parameters": [obj_node.name for obj_node, _ in edges],
-                    "scene": node.scene,
-                }
-            )
-
-        return predicates
+        return self._predicates
 
     def __eq__(self, other: "PlanGraph") -> bool:
         """
@@ -393,8 +378,7 @@ class PlanGraph(metaclass=abc.ABCMeta):
             scale=-1,
         )
 
-        if fig is None:
-            fig = plt.figure()
+        fig = fig or plt.figure()
 
         nx.draw(nx_graph, pos=pos, ax=fig.gca(), with_labels=True)
 
@@ -472,12 +456,16 @@ class ProblemGraph(PlanGraph):
         """
         super().__init__(constants, domain=domain, requirements=requirements)
 
-        for scene, predicates in (
-            (Scene.INIT, init_predicates),
-            (Scene.GOAL, goal_predicates),
-        ):
-            for predicate in predicates:
-                self._add_predicate(predicate, scene=scene)
+        self._init_predicates: list[dict[str, Any]] = []
+        self._init_predicate_nodes: list[PlanGraphNode] = []
+        self._goal_predicates: list[dict[str, Any]] = []
+        self._goal_predicate_nodes: list[PlanGraphNode] = []
+
+        for predicate in init_predicates:
+            self._add_predicate(predicate, scene=Scene.INIT)
+
+        for predicate in goal_predicates:
+            self._add_predicate(predicate, scene=Scene.GOAL)
 
     def __eq__(self, other: "ProblemGraph") -> bool:
         return (
@@ -489,93 +477,52 @@ class ProblemGraph(PlanGraph):
     def add_node(self, node: PlanGraphNode):
         super().add_node(node)
         if node.label == Label.PREDICATE:
-            self.__dict__.pop("init_predicate_nodes", None)
-            self.__dict__.pop("goal_predicate_nodes", None)
-            self.__dict__.pop("init_predicates", None)
-            self.__dict__.pop("goal_predicates", None)
+            if node.scene == Scene.INIT:
+                self._init_predicate_nodes.append(node)
+            elif node.scene == Scene.GOAL:
+                self._goal_predicate_nodes.append(node)
 
-        self.__dict__.pop("_decompose", None)
+    def _add_predicate(self, predicate: dict[str, Any], scene: Scene | None = None):
+        super()._add_predicate(predicate, scene)
 
-    def add_edge(
-        self, u: str | PlanGraphNode, v: str | PlanGraphNode, edge: PlanGraphEdge
-    ):
-        super().add_edge(u, v, edge)
+        if scene == Scene.INIT:
+            self._init_predicates.append(predicate)
+        elif scene == Scene.GOAL:
+            self._goal_predicates.append(predicate)
 
-        self.__dict__.pop("init_predicate_nodes", None)
-        self.__dict__.pop("goal_predicate_nodes", None)
-        self.__dict__.pop("init_predicates", None)
-        self.__dict__.pop("goal_predicates", None)
-
-        self.__dict__.pop("_decompose", None)
-
-    @cached_property
+    @property
     def init_predicate_nodes(self) -> list[PlanGraphNode]:
         """Get a list of predicate nodes in the initial scene.
 
         Returns:
             list[PlanGraphNode]: A list of predicate nodes in the initial scene.
         """
-        return [
-            node
-            for node in self.nodes
-            if node.label == Label.PREDICATE and node.scene == Scene.INIT
-        ]
+        return self._init_predicate_nodes
 
-    @cached_property
+    @property
     def goal_predicate_nodes(self) -> list[PlanGraphNode]:
         """Get a list of predicate nodes in the goal scene.
 
         Returns:
             list[PlanGraphNode]: A list of predicate nodes in the goal scene.
         """
-        return [
-            node
-            for node in self.nodes
-            if node.label == Label.PREDICATE and node.scene == Scene.GOAL
-        ]
+        return self._goal_predicate_nodes
 
-    @cached_property
+    @property
     def init_predicates(self) -> list[dict[str, Any]]:
-        predicates = []
-        for node in self.init_predicate_nodes:
-            edges = self.out_edges(node)
-            edges.sort(key=lambda x: x[1].position)
-            predicates.append(
-                {
-                    "typing": node.typing,
-                    "parameters": [obj_node.name for obj_node, _ in edges],
-                    "scene": node.scene,
-                }
-            )
+        return self._init_predicates
 
-        return predicates
-
-    @cached_property
+    @property
     def goal_predicates(self) -> list[dict[str, Any]]:
-        predicates = []
-        for node in self.goal_predicate_nodes:
-            edges = self.out_edges(node)
-            edges.sort(key=lambda x: x[1].position)
-            predicates.append(
-                {
-                    "typing": node.typing,
-                    "parameters": [obj_node.name for obj_node, _ in edges],
-                    "scene": node.scene,
-                }
-            )
+        return self._goal_predicates
 
-        return predicates
-
-    @cached_property
-    def _decompose(self) -> tuple[SceneGraph, SceneGraph]:
-        """
-        Decompose the problem graph into initial and goal scene graphs.
+    def init(self) -> SceneGraph:
+        """Return the initial scene graph.
 
         Returns:
-            tuple[SceneGraph, SceneGraph]: A tuple containing the initial and goal scene graphs.
+            SceneGraph: The initial scene graph.
         """
-
-        init_scene = SceneGraph(
+        return SceneGraph(
             constants=self.constants,
             predicates=self.init_predicates,
             domain=self.domain,
@@ -583,7 +530,13 @@ class ProblemGraph(PlanGraph):
             requirements=self._requirements,
         )
 
-        goal_scene = SceneGraph(
+    def goal(self) -> SceneGraph:
+        """Return the goal scene graph.
+
+        Returns:
+            SceneGraph: The goal scene graph.
+        """
+        return SceneGraph(
             constants=self.constants,
             predicates=self.goal_predicates,
             domain=self.domain,
@@ -591,17 +544,17 @@ class ProblemGraph(PlanGraph):
             requirements=self._requirements,
         )
 
-        return init_scene, goal_scene
-
     def decompose(self) -> tuple[SceneGraph, SceneGraph]:
-        """
-        Decompose the problem graph into initial and goal scene graphs.
+        """Decompose the problem graph into initial and goal scene graphs.
 
         Returns:
             tuple[SceneGraph, SceneGraph]: A tuple containing the initial and goal scene graphs.
         """
 
-        return self._decompose
+        init_scene = self.init()
+        goal_scene = self.goal()
+
+        return init_scene, goal_scene
 
     @staticmethod
     def join(init: SceneGraph, goal: SceneGraph) -> "ProblemGraph":

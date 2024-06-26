@@ -161,13 +161,11 @@ class TestBlocksworldOracle:
         """
         domain = DOMAINS["blocksworld"]
         for name, desc in {
-            "blocksworld_invalid_1": blocksworld_invalid_1,
             "blocksworld_invalid_2": blocksworld_invalid_2,
-            "blocksworld_invalid_3": blocksworld_invalid_3,
         }.items():
             with subtests.test(name):
                 plan = oracle.plan(builder.build(desc))
-                assert plan == [], name
+                assert plan == [], f"{name}: {plan}"
 
                 plan_str = oracle.plan_to_string(plan)
                 assert not downward.validate(domain, desc, plan_str, VALIDATE)

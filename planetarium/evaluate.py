@@ -3,7 +3,7 @@ import os
 from pddl.parser.problem import LenientProblemParser
 from pddl.formatter import problem_to_string
 
-from planetarium import *
+from planetarium import builder, oracle, metric, downward
 
 
 VALIDATE = os.getenv("VALIDATE", "Validate")
@@ -129,7 +129,7 @@ def evaluate(
 
     if source_graph == target_graph:
         equivalent = True
-    elif source_graph.decompose()[0] != target_graph.decompose()[0]:
+    elif not metric.equals(source_graph.init(), target_graph.init()):
         equivalent = False
     else:
         equivalent = metric.equals(

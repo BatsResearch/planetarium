@@ -1004,39 +1004,19 @@ class TestBlocksworldOracle:
             "blocksworld_underspecified_arm": blocksworld_underspecified_arm,
             "blocksworld_holding": blocksworld_holding,
         }.items():
+            problem = builder.build(desc)
+            init, goal = problem.decompose()
             with subtests.test(name):
-                problem = builder.build(desc)
-                init, goal = problem.decompose()
                 assert reduce_and_inflate(init)
                 assert reduce_and_inflate(goal)
                 assert reduce_and_inflate(problem)
 
                 assert problem == oracle.inflate(
                     oracle.ReducedProblemGraph.join(
-                        oracle.reduce(init, validate=True),
-                        oracle.reduce(goal, validate=True),
+                        oracle.reduce(init),
+                        oracle.reduce(goal),
                     )
                 )
-
-    def test_invalid(
-        self,
-        subtests,
-        blocksworld_invalid_1,
-        blocksworld_invalid_2,
-        blocksworld_invalid_3,
-    ):
-        for name, desc in {
-            "blocksworld_invalid_1": blocksworld_invalid_1,
-            "blocksworld_invalid_2": blocksworld_invalid_2,
-            "blocksworld_invalid_3": blocksworld_invalid_3,
-        }.items():
-            with subtests.test(name):
-                problem = builder.build(desc)
-                _, goal = problem.decompose()
-                with pytest.raises(ValueError):
-                    oracle.reduce(goal, validate=True)
-                with pytest.raises(ValueError):
-                    oracle.reduce(problem, validate=True)
 
 
 class TestGripperOracle:
@@ -1046,6 +1026,7 @@ class TestGripperOracle:
 
     def test_fully_specified(
         self,
+        subtests,
         gripper_fully_specified,
         gripper_no_goal_types,
         gripper_fully_specified_not_strict,
@@ -1053,28 +1034,18 @@ class TestGripperOracle:
         """
         Test the fully specified gripper problem.
         """
-        problem = builder.build(gripper_fully_specified)
-        full = oracle.fully_specify(problem)
-        assert oracle.fully_specify(full) == full
+        descs = [
+            ("gripper_fully_specified", gripper_fully_specified),
+            ("gripper_no_goal_types", gripper_no_goal_types),
+            ("gripper_fully_specified_not_strict", gripper_fully_specified_not_strict),
+        ]
+        for name, desc in descs:
+            with subtests.test(name):
+                problem = builder.build(desc)
+                full = oracle.fully_specify(problem)
+                assert oracle.fully_specify(full) == full
 
-        problem = builder.build(gripper_no_goal_types)
-        full = oracle.fully_specify(problem)
-        assert oracle.fully_specify(full) == full
-
-        problem = builder.build(gripper_fully_specified_not_strict)
-        full = oracle.fully_specify(problem)
-        assert oracle.fully_specify(full) == full
-
-    def test_inflate(self, gripper_fully_specified):
-        """
-        Test the inflate function.
-        """
-
-        init, goal = builder.build(gripper_fully_specified).decompose()
-        assert reduce_and_inflate(init)
-        assert reduce_and_inflate(goal)
-
-    def test_reduce_inflate(
+    def test_inflate(
         self,
         subtests,
         gripper_fully_specified,
@@ -1082,18 +1053,25 @@ class TestGripperOracle:
         gripper_underspecified_1,
         gripper_underspecified_2,
         gripper_underspecified_3,
+        gripper_no_robby_init,
     ):
-        for name, desc in {
-            "gripper_fully_specified": gripper_fully_specified,
-            "gripper_no_robby": gripper_no_robby,
-            "gripper_underspecified_1": gripper_underspecified_1,
-            "gripper_underspecified_2": gripper_underspecified_2,
-            "gripper_underspecified_3": gripper_underspecified_3,
-        }.items():
-            with subtests.test(name):
-                problem = builder.build(desc)
-                init, goal = problem.decompose()
+        """
+        Test the inflate function.
+        """
 
+        descs = [
+            ("gripper_fully_specified", gripper_fully_specified),
+            ("gripper_no_robby", gripper_no_robby),
+            ("gripper_underspecified_1", gripper_underspecified_1),
+            ("gripper_underspecified_2", gripper_underspecified_2),
+            ("gripper_underspecified_3", gripper_underspecified_3),
+            ("gripper_no_robby_init", gripper_no_robby_init),
+        ]
+
+        for name, desc in descs:
+            problem = builder.build(desc)
+            init, goal = problem.decompose()
+            with subtests.test(name):
                 assert reduce_and_inflate(init)
                 assert reduce_and_inflate(goal)
                 assert reduce_and_inflate(problem)
