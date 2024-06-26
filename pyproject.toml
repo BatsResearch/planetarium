@@ -24,8 +24,11 @@ pytest = "^7.4.3"
 mypy = "^1.7.1"
 pytest-cov = "^4.1.0"
 pytest-timeout = "^2.2.0"
+pytest-subtests = "^0.12.1"
 black = {extras = ["jupyter"], version = "^24.4.2"}
 
+[tool.poetry.group.all]
+optional = true
 
 [tool.poetry.group.all.dependencies]
 lark = "^1.1.9"
