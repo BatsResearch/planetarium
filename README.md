@@ -53,7 +53,7 @@ dataset = load_dataset("BatsResearch/planetarium")
 ```
 Here, `dataset["test"]` is the main test set used in the paper. You may evaluate on this set to reproduce our results.
 
-You can reporduce the dataset, the splits, and a report by running the following command:
+You can reproduce the dataset, the splits, and a report by running the following command:
 ```bash
 python dataset_generator.py -c dataset_config.yaml
 ```
