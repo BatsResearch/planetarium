@@ -1,7 +1,10 @@
 # planetarium🪐
 
 <p align="center">
-    <a href="https://arxiv.org/abs/2407.03321"><img src="https://badgen.net/static/arxiv/2407.03321/blue" /></a>
+    <a href="https://huggingface.co/papers/2407.03321"><img src="https://img.shields.io/badge/⭐_daily_papers-%233-orange?logo=huggingface" /></a>
+    <a href="https://arxiv.org/abs/2407.03321"><img src="https://img.shields.io/badge/arxiv-2407.03321-b31b1b?logo=arxiv" /></a>
+    <a href="https://x.com/max_zuo/status/1811026554123583718"><img src="https://img.shields.io/badge/summary-000000?logo=x" /></a>
+    <a href="https://arxiv.org/abs/2407.03321"><img src="https://img.shields.io/badge/datasets-planetarium-FFD21E?logo=huggingface" /></a>
 </p>
 
 Planetarium🪐 is a [dataset](https://huggingface.co/datasets/BatsResearch/planetarium) and benchmark for assessing LLMs in translating natural language descriptions of planning problems into PDDL. We developed a robust method for comparing PDDL problem descriptions using graph isomorphism.
@@ -53,7 +56,7 @@ dataset = load_dataset("BatsResearch/planetarium")
 ```
 Here, `dataset["test"]` is the main test set used in the paper. You may evaluate on this set to reproduce our results.
 
-You can reporduce the dataset, the splits, and a report by running the following command:
+You can reproduce the dataset, the splits, and a report by running the following command:
 ```bash
 python dataset_generator.py -c dataset_config.yaml
 ```
@@ -91,6 +94,6 @@ This lets check correctness of the translation of the natural language descripti
 Below is a flowchart providing an overview of the equivalence algorithm:
 
 ![Equivalence Algorithm Overview](assets/equivalence.png)
-<p style="text-align: center;">(Left) Two planning problems, in PDDL problem description, real-world scenario, and graph representations. (Center) Fully specified graph representation. (Right) Graph isomorphism.</p>
+<p align="center">(Left) Two planning problems, in PDDL problem description, real-world scenario, and graph representations. (Center) Fully specified graph representation. (Right) Graph isomorphism.</p>
 
 The key to this algorithm working is building a specially crafted "fully specify" function, which we build for each domain that we want to support. We provide implementations for the `blocksworld` and `gripper` domains in the `planetarium.oracle` module.
