@@ -4,7 +4,7 @@
     <a href="https://huggingface.co/papers/2407.03321"><img src="https://img.shields.io/badge/⭐_daily_papers-%233-orange?logo=huggingface" /></a>
     <a href="https://arxiv.org/abs/2407.03321"><img src="https://img.shields.io/badge/arxiv-2407.03321-b31b1b?logo=arxiv" /></a>
     <a href="https://x.com/max_zuo/status/1811026554123583718"><img src="https://img.shields.io/badge/summary-000000?logo=x" /></a>
-    <a href="https://arxiv.org/abs/2407.03321"><img src="https://img.shields.io/badge/datasets-planetarium-FFD21E?logo=huggingface" /></a>
+    <a href="https://huggingface.co/datasets/BatsResearch/planetarium"><img src="https://img.shields.io/badge/datasets-planetarium-FFD21E?logo=huggingface" /></a>
 </p>
 
 Planetarium🪐 is a [dataset](https://huggingface.co/datasets/BatsResearch/planetarium) and benchmark for assessing LLMs in translating natural language descriptions of planning problems into PDDL. We developed a robust method for comparing PDDL problem descriptions using graph isomorphism.
