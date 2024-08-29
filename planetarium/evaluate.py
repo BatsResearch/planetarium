@@ -86,6 +86,7 @@ def evaluate(
     target_pddl_str: str,
     domain_str: str | None = None,
     is_placeholder: bool = False,
+    check_solveable: bool = True,
 ) -> tuple[bool, bool, bool]:
     """Evaluate two PDDL problem descriptions for equivalence.
 
@@ -95,6 +96,9 @@ def evaluate(
         domain_str (str): The domain PDDL string.
         is_placeholder (bool, optional): Whether or not to treat the ground truth
             as a "placeholder" description. Defaults to False.
+        check_solveable (bool, optional): Whether or not to check if the problem
+            is solveable. Defaults to True. If False, the function will return
+            False for the solveable element.
 
     Returns:
         tuple: A tuple containing the following boolean elements:
@@ -117,15 +121,16 @@ def evaluate(
     clean_pddl_str = problem_to_string(LenientProblemParser()(target_pddl_str))
     domain_str = domain_str or DOMAINS.get(target_graph.domain)
 
-    try:
-        solveable = downward.validate(
-            domain_str,
-            clean_pddl_str,
-            oracle.plan_to_string(oracle.plan(target_graph)),
-            VALIDATE,
-        )
-    except:
-        return parseable, solveable, equivalent
+    if check_solveable:
+        try:
+            solveable = downward.validate(
+                domain_str,
+                clean_pddl_str,
+                oracle.plan_to_string(oracle.plan(target_graph)),
+                VALIDATE,
+            )
+        except:
+            return parseable, solveable, equivalent
 
     if source_graph == target_graph:
         equivalent = True

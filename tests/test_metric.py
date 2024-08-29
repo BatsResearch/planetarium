@@ -15,7 +15,7 @@ from .test_pddl import (
     wrong_initial_problem_string,
 )
 
-from .test_oracle import (
+from .problem_fixtures import (
     blocksworld_underspecified,
     blocksworld_missing_clears,
     blocksworld_missing_ontables,
