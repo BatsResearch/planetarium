@@ -34,6 +34,9 @@ def evaluate(
         domain_str (str): The domain PDDL string.
         is_placeholder (bool, optional): Whether or not to treat the ground truth
             as a "placeholder" description. Defaults to False.
+        check_solveable (bool, optional): Whether or not to check if the problem
+            is solveable. Defaults to True. If False, the function will return
+            False for the solveable element.
 
     Returns:
         tuple: A tuple containing the following boolean elements:

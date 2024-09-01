@@ -3,7 +3,7 @@ import pytest
 
 import planetarium
 
-from .test_oracle import (
+from .problem_fixtures import (
     blocksworld_underspecified,
     blocksworld_missing_clears,
     blocksworld_missing_ontables,

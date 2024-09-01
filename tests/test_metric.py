@@ -15,7 +15,7 @@ from .test_pddl import (
     wrong_initial_problem_string,
 )
 
-from .test_oracle import (
+from .problem_fixtures import (
     blocksworld_underspecified,
     blocksworld_missing_clears,
     blocksworld_missing_ontables,
@@ -287,4 +287,3 @@ class TestMetrics:
                 assert not metric.equals(p1, p2, is_placeholder=False)
                 assert not metric.equals(p2, p1, is_placeholder=True)
                 assert not metric.equals(p2, p1, is_placeholder=False)
-
