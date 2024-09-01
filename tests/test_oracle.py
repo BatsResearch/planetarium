@@ -21,6 +21,7 @@ from .problem_fixtures import (
     rover_single_line_fully_specified_1,
     rover_single_line_fully_specified_2,
     rover_single_line_fully_specified_3,
+    rover_single_line_fully_specified_4,
 )
 
 
@@ -195,6 +196,7 @@ class TestRoverSingleOracle:
         rover_single_line_fully_specified_1,
         rover_single_line_fully_specified_2,
         rover_single_line_fully_specified_3,
+        rover_single_line_fully_specified_4,
     ):
         """
         Test the fully specified rover problem.
@@ -204,6 +206,7 @@ class TestRoverSingleOracle:
             ("rover_single_line_fully_specified_1", rover_single_line_fully_specified_1),
             ("rover_single_line_fully_specified_2", rover_single_line_fully_specified_2),
             ("rover_single_line_fully_specified_3", rover_single_line_fully_specified_3),
+            ("rover_single_line_fully_specified_4", rover_single_line_fully_specified_4),
         ]
         for name, desc in descs:
             with subtests.test(name):

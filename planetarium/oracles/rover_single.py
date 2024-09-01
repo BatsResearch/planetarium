@@ -305,6 +305,7 @@ def rover_subgraph(scene: ReducedSceneGraph) -> ReducedSceneGraph:
 
     return subgraph
 
+
 def all_endpoints(
     scene: ReducedSceneGraph,
     path_map: rx.AllPairsMultiplePathMapping,

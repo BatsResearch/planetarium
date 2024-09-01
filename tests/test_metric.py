@@ -22,6 +22,8 @@ from .problem_fixtures import (
     blocksworld_fully_specified,
     gripper_fully_specified,
     gripper_no_robby,
+    rover_single_line_fully_specified_4,
+    rover_single_line_fully_specified_4a,
 )
 
 
@@ -287,3 +289,21 @@ class TestMetrics:
                 assert not metric.equals(p1, p2, is_placeholder=False)
                 assert not metric.equals(p2, p1, is_placeholder=True)
                 assert not metric.equals(p2, p1, is_placeholder=False)
+
+    def test_rover_single_eqquivalence(self, subtests, rover_single_line_fully_specified_4, rover_single_line_fully_specified_4a,):
+        """Test the equivalence of rover single line problems."""
+        p1 = builder.build(rover_single_line_fully_specified_4)
+        p2 = builder.build(rover_single_line_fully_specified_4a)
+
+        p1 = oracle.fully_specify(p1)
+        p2 = oracle.fully_specify(p2)
+
+        # equivalence to itself
+        assert metric.equals(p1, p1, is_placeholder=True)
+        assert metric.equals(p1, p1, is_placeholder=False)
+
+        # check invalid equivalence
+        assert not metric.equals(p1, p2, is_placeholder=True)
+        assert not metric.equals(p1, p2, is_placeholder=False)
+        assert not metric.equals(p2, p1, is_placeholder=True)
+        assert not metric.equals(p2, p1, is_placeholder=False)

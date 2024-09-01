@@ -35,14 +35,14 @@
   (:action sample_soil
     :parameters (?s - store ?p - waypoint)
     :precondition (and (at_rover ?p) (at_soil_sample ?p) (empty ?s))
-    :effect (and (not (empty ?s)) (full ?s) (have_soil_analysis ?x ?p)
+    :effect (and (not (empty ?s)) (full ?s) (have_soil_analysis ?p)
       (not (at_soil_sample ?p)))
   )
 
   (:action sample_rock
     :parameters (?s - store ?p - waypoint)
     :precondition (and (at_rover ?p) (at_rock_sample ?p) (empty ?s))
-    :effect (and (not (empty ?s)) (full ?s) (have_rock_analysis ?x ?p)
+    :effect (and (not (empty ?s)) (full ?s) (have_rock_analysis ?p)
       (not (at_rock_sample ?p)))
   )
 
@@ -61,7 +61,7 @@
   (:action communicate_soil_data
     :parameters (?p - waypoint ?x - waypoint ?y - waypoint)
     :precondition (and (at_rover ?x)
-      (at_lander ?y)(have_soil_analysis ?r ?p)
+      (at_lander ?y)(have_soil_analysis ?p)
       (visible ?x ?y)(available)(channel_free))
     :effect (and (not (available))
       (not (channel_free))(channel_free)
