@@ -9,6 +9,8 @@ from .test_oracle import (
     blocksworld_missing_ontables,
     blocksworld_fully_specified,
     blocksworld_invalid_1,
+    rover_line_fully_specified_1,
+    rover_line_fully_specified_2,
 )
 
 
@@ -35,6 +37,51 @@ def blocksworld_wrong_init():
             (clear b4)
             (on-table b5)
             (on b6 b5)
+            (clear b6)
+        )
+        (:goal
+            (and
+            (on-table b1)
+            (clear b1)
+
+            (on-table b2)
+            (on b3 b2)
+            (clear b3)
+
+            (on-table b4)
+            (on b5 b4)
+            (on b6 b5)
+            (clear b6)
+            )
+        )
+    )
+    """
+
+
+@pytest.fixture
+def blocksworld_fully_specified_wrong_domain():
+    """
+    Fixture providing a fully specified blocksworld problem with wrong domain.
+    """
+    return """
+    (define (problem staircase)
+        (:domain blocksworld-wrong)
+        (:objects
+            b1 b2 b3 b4 b5 b6
+        )
+        (:init
+            (arm-empty)
+            (on-table b1)
+            (clear b1)
+            (on-table b2)
+            (clear b2)
+            (on-table b3)
+            (clear b3)
+            (on-table b4)
+            (clear b4)
+            (on-table b5)
+            (clear b5)
+            (on-table b6)
             (clear b6)
         )
         (:goal
@@ -235,3 +282,40 @@ class TestEvaluate:
                 True,
                 False,
             )
+
+    def test_unsolveable_rovers(
+        self,
+        rover_line_fully_specified_1,
+        rover_line_fully_specified_2,
+    ):
+        """
+        Test if the evaluation of PDDL problem descriptions is correct.
+        """
+        assert planetarium.evaluate(
+            rover_line_fully_specified_1,
+            rover_line_fully_specified_1,
+        ) == (True, True, True)
+        assert planetarium.evaluate(
+            rover_line_fully_specified_2,
+            rover_line_fully_specified_2,
+        ) == (True, False, False)
+
+
+class TestUnsupportedDomain:
+    """
+    Test suite for unsupported domain.
+    """
+
+    def test_plan(
+        self, blocksworld_fully_specified, blocksworld_fully_specified_wrong_domain
+    ):
+        """
+        Test if the oracle can plan for an unsupported domain.
+        """
+        assert planetarium.evaluate(
+            blocksworld_fully_specified, blocksworld_fully_specified_wrong_domain
+        ) == (
+            True,
+            False,
+            False,
+        )

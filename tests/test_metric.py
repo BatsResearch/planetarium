@@ -22,6 +22,8 @@ from .test_oracle import (
     blocksworld_fully_specified,
     gripper_fully_specified,
     gripper_no_robby,
+    rover_line_fully_specified,
+    rover_line_fully_specified_1,
 )
 
 
@@ -287,3 +289,15 @@ class TestMetrics:
                 assert not metric.equals(p1, p2, is_placeholder=False)
                 assert not metric.equals(p2, p1, is_placeholder=True)
                 assert not metric.equals(p2, p1, is_placeholder=False)
+
+    def test_rover_equivalence(self, rover_line_fully_specified_1):
+        """Test the equivalence of rover problems."""
+        p1 = builder.build(rover_line_fully_specified_1)
+        p2 = oracle.fully_specify(p1)
+
+        assert metric.equals(p1.init(), p2.init(), is_placeholder=True)
+        assert metric.equals(p1.init(), p2.init(), is_placeholder=False)
+        assert metric.equals(p1.goal(), p2.goal(), is_placeholder=True)
+        assert metric.equals(p1.goal(), p2.goal(), is_placeholder=False)
+        assert metric.equals(p1, p2, is_placeholder=True)
+        assert metric.equals(p1, p2, is_placeholder=False)
