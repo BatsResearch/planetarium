@@ -17,7 +17,6 @@ from .oracles.gripper import (
     _fully_specify_gripper,
     _plan_gripper,
 )
-from .oracles.rover import _reduce_rover, _inflate_rover, _fully_specify_rover
 from .oracles.rover_single import _reduce_rover_single, _inflate_rover_single, _fully_specify_rover_single
 
 
@@ -53,8 +52,6 @@ def reduce(
             return _reduce_blocksworld(graph)
         case "gripper":
             return _reduce_gripper(graph)
-        case "rover":
-            return _reduce_rover(graph)
         case "rover-single":
             return _reduce_rover_single(graph)
         case _:
@@ -81,8 +78,6 @@ def inflate(
             return _inflate_blocksworld(scene)
         case "gripper":
             return _inflate_gripper(scene)
-        case "rover":
-            return _inflate_rover(scene)
         case "rover-single":
             return _inflate_rover_single(scene)
         case _:
@@ -118,10 +113,6 @@ def fully_specify(
             fully_specified_goal = _fully_specify_gripper(
                 reduced_init,
                 reduced_goal,
-            )
-        case "rover":
-            reduced_init, fully_specified_goal = _fully_specify_rover(
-                *problem.decompose()
             )
         case "rover-single":
             reduced_init, fully_specified_goal = _fully_specify_rover_single(

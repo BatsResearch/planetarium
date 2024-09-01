@@ -491,7 +491,7 @@ def _fully_specify_rover_single(
 
         endpoints = {rover_map.graph.nodes()[e] for e in endpoints}
 
-    if not final_destination():
+    if not final_pos:
         # rover doesn't need to be at a particular location,
         # check how many locations he can be at
         if len(endpoints) == 1:

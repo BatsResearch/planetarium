@@ -1731,3 +1731,66 @@ def rover_single_line_fully_specified_2():
             )
         )
     )"""
+
+
+@pytest.fixture
+def rover_single_line_fully_specified_3():
+    return """
+    (define (problem rover)
+        (:domain rover-single)
+        (:objects
+            site1 site2 site3 site4 site5 site6 - waypoint
+            store1 store2 - store
+            rgb - mode
+            camera1 camera2 camera3 - camera
+            objective1 objective2 objective3 - objective
+        )
+        (:init
+            (can_traverse site1 site2)
+            (can_traverse site2 site3)
+            (can_traverse site3 site4)
+            (can_traverse site4 site5)
+            (can_traverse site5 site6)
+            (visible site1 site2)
+            (visible site2 site3)
+            (visible site3 site4)
+            (visible site4 site5)
+            (visible site5 site6)
+            (at_rover site1)
+            (available)
+            (at_lander site6)
+            (empty store1)
+            (full store2)
+            (supports camera1 rgb)
+            (supports camera2 rgb)
+            (supports camera3 rgb)
+            (visible_from objective1 site5)
+            (channel_free)
+        )
+        (:goal
+            (and
+                (can_traverse site1 site2)
+                (can_traverse site2 site3)
+                (can_traverse site3 site4)
+                (can_traverse site4 site5)
+                (can_traverse site5 site6)
+                (visible site1 site2)
+                (visible site2 site3)
+                (visible site3 site4)
+                (visible site4 site5)
+                (visible site5 site6)
+                (available)
+                (at_rover site6)
+                (at_lander site6)
+                (empty store1)
+                (full store2)
+                (supports camera1 rgb)
+                (supports camera2 rgb)
+                (supports camera3 rgb)
+                (visible_from objective1 site5)
+                (channel_free)
+                (have_image objective1 rgb)
+                (communicated_image_data objective1 rgb)
+            )
+        )
+    )"""

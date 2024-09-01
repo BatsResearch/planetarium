@@ -9,8 +9,6 @@ from .test_oracle import (
     blocksworld_missing_ontables,
     blocksworld_fully_specified,
     blocksworld_invalid_1,
-    rover_line_fully_specified_1,
-    rover_line_fully_specified_2,
 )
 
 
@@ -282,23 +280,6 @@ class TestEvaluate:
                 True,
                 False,
             )
-
-    def test_unsolveable_rovers(
-        self,
-        rover_line_fully_specified_1,
-        rover_line_fully_specified_2,
-    ):
-        """
-        Test if the evaluation of PDDL problem descriptions is correct.
-        """
-        assert planetarium.evaluate(
-            rover_line_fully_specified_1,
-            rover_line_fully_specified_1,
-        ) == (True, True, True)
-        assert planetarium.evaluate(
-            rover_line_fully_specified_2,
-            rover_line_fully_specified_2,
-        ) == (True, False, False)
 
 
 class TestUnsupportedDomain:
