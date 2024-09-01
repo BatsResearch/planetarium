@@ -32,6 +32,18 @@ test-trackers = ["comet-ml", "dvclive", "tensorboard", "wandb"]
 testing = ["bitsandbytes", "datasets", "diffusers", "evaluate", "parameterized", "pytest (>=7.2.0,<=8.0.0)", "pytest-subtests", "pytest-xdist", "scikit-learn", "scipy", "timm", "torchpippy (>=0.2.0)", "tqdm", "transformers"]
 
 [[package]]
+name = "aenum"
+version = "3.1.15"
+description = "Advanced Enumerations (compatible with Python's stdlib Enum), NamedTuples, and NamedConstants"
+optional = false
+python-versions = "*"
+files = [
+    {file = "aenum-3.1.15-py2-none-any.whl", hash = "sha256:27b1710b9d084de6e2e695dab78fe9f269de924b51ae2850170ee7e1ca6288a5"},
+    {file = "aenum-3.1.15-py3-none-any.whl", hash = "sha256:e0dfaeea4c2bd362144b87377e2c61d91958c5ed0b4daf89cb6f45ae23af6288"},
+    {file = "aenum-3.1.15.tar.gz", hash = "sha256:8cbd76cd18c4f870ff39b24284d3ea028fbe8731a58df3aa581e434c575b9559"},
+]
+
+[[package]]
 name = "aiohttp"
 version = "3.9.5"
 description = "Async http client/server framework (asyncio)"
@@ -4982,4 +4994,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "8d6b39c4e1ed3668b4e342451702a4302620923f7f8df24a0f9cd86a26a0bf41"
+content-hash = "d3489ddc85108b0b6541664222828898eab1fa8b437382db58a0b150316718fe"
