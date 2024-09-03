@@ -9,6 +9,7 @@ from . import domains
 
 
 VALIDATE = os.getenv("VALIDATE", "Validate")
+DOWNWARD = os.getenv("DOWNWARD", "downward")
 DOMAINS = dict()
 
 # load domains
@@ -24,6 +25,7 @@ def evaluate(
     is_placeholder: bool = False,
     check_solveable: bool = True,
     val: str = VALIDATE,
+    fast_downward: str = DOWNWARD,
     **downward_args,
 ) -> tuple[bool, bool, bool]:
     """Evaluate two PDDL problem descriptions for equivalence.
@@ -67,6 +69,7 @@ def evaluate(
                 plan_str, _ = downward.plan(
                     domain_str,
                     clean_pddl_str,
+                    downward=fast_downward,
                     **downward_args,
                 )
             except:
