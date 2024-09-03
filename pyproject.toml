@@ -16,6 +16,7 @@ pyyaml = "^6.0.1"
 jinja2 = "^3.1.4"
 rustworkx = "^0.14.2"
 matplotlib = "^3.9.0"
+aenum = "^3.1.15"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -26,6 +27,7 @@ pytest-cov = "^4.1.0"
 pytest-timeout = "^2.2.0"
 pytest-subtests = "^0.12.1"
 black = {extras = ["jupyter"], version = "^24.4.2"}
+pytest-mock = "^3.14.0"
 
 [tool.poetry.group.all]
 optional = true

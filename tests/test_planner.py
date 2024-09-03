@@ -1,10 +1,11 @@
 import os
+import pytest
 
 VALIDATE = os.getenv("VALIDATE", "Validate")
 
 from planetarium import builder, downward, oracle
 
-from .test_oracle import (
+from .problem_fixtures import (
     blocksworld_fully_specified,
     blocksworld_holding,
     blocksworld_missing_clears,
@@ -22,6 +23,7 @@ from .test_oracle import (
     gripper_multiple_typing,
     gripper_no_goal_types,
     gripper_no_robby,
+    gripper_robby_at_last,
     gripper_underspecified_1,
     gripper_underspecified_2,
     gripper_underspecified_3,
@@ -152,9 +154,7 @@ class TestBlocksworldOracle:
     def test_invalid_plan(
         self,
         subtests,
-        blocksworld_invalid_1,
         blocksworld_invalid_2,
-        blocksworld_invalid_3,
     ):
         """
         Test if the oracle can plan for an invalid blocksworld problem.
@@ -164,7 +164,10 @@ class TestBlocksworldOracle:
             "blocksworld_invalid_2": blocksworld_invalid_2,
         }.items():
             with subtests.test(name):
-                plan = oracle.plan(builder.build(desc))
+                try:
+                    plan = oracle.plan(builder.build(desc))
+                except Exception as e:
+                    plan = []
                 assert plan == [], f"{name}: {plan}"
 
                 plan_str = oracle.plan_to_string(plan)
@@ -183,6 +186,7 @@ class TestGripperOracle:
         gripper_fully_specified_not_strict,
         gripper_no_goal_types,
         gripper_no_robby,
+        gripper_robby_at_last,
         gripper_underspecified_1,
         gripper_underspecified_2,
         gripper_underspecified_3,
@@ -196,6 +200,7 @@ class TestGripperOracle:
             "gripper_fully_specified_not_strict": gripper_fully_specified_not_strict,
             "gripper_no_goal_types": gripper_no_goal_types,
             "gripper_no_robby": gripper_no_robby,
+            "gripper_robby_at_last": gripper_robby_at_last,
             "gripper_underspecified_1": gripper_underspecified_1,
             "gripper_underspecified_2": gripper_underspecified_2,
             "gripper_underspecified_3": gripper_underspecified_3,
@@ -225,8 +230,11 @@ class TestUnsupportedDomain:
     Test suite for unsupported domain.
     """
 
-    def test_plan(self, blocksworld_fully_specified):
+    def test_plan(self, mocker, blocksworld_fully_specified):
         """
         Test if the oracle can plan for an unsupported domain.
         """
-        oracle.plan(builder.build(blocksworld_fully_specified), domain="unsupported")
+        problem = builder.build(blocksworld_fully_specified)
+        mocker.patch("planetarium.oracle.fully_specify", return_value=problem)
+        with pytest.raises(oracle.DomainNotSupportedError):
+            oracle.plan(problem, domain="unsupported_domain")

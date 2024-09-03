@@ -25,7 +25,7 @@ class PlanGraphNode:
         node: str,
         name: str,
         label: Label,
-        typing: str | None = None,
+        typing: set | str | None = None,
         scene: Scene | None = None,
     ):
         self.node = node
@@ -202,7 +202,10 @@ class PlanGraph(metaclass=abc.ABCMeta):
             predicate (dict): A dictionary representing the predicate.
             scene (Scene, optional): The scene in which the predicate occurs.
         """
-        predicate.update({"scene": scene})
+        if scene:
+            predicate.update({"scene": scene})
+        if predicate in self.predicates:
+            return
         predicate_name = self._build_unique_predicate_name(
             predicate_name=predicate["typing"],
             argument_names=predicate["parameters"],
