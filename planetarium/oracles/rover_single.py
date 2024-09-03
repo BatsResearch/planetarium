@@ -182,7 +182,7 @@ def _inflate_rover_single(
             constants,
             [pred for pred in predicates if pred["scene"] == graph.Scene.INIT],
             [pred for pred in predicates if pred["scene"] == graph.Scene.GOAL],
-            domain="rover",
+            domain="rover-single",
             requirements=scene._requirements,
         )
     else:
