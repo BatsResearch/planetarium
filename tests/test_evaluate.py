@@ -9,6 +9,11 @@ from .problem_fixtures import (
     blocksworld_missing_ontables,
     blocksworld_fully_specified,
     blocksworld_invalid_1,
+    rover_single_line_equiv,
+    rover_single_line_equiva,
+    rover_single_line_equiv_1,
+    rover_single_line_equiv_1a,
+    rover_single_line_equiv_1b,
 )
 
 
@@ -280,6 +285,47 @@ class TestEvaluate:
                 True,
                 False,
             )
+
+    def test_rover_single_equivalent(
+        self,
+        subtests,
+        rover_single_line_equiv,
+        rover_single_line_equiva,
+        rover_single_line_equiv_1,
+        rover_single_line_equiv_1a,
+        rover_single_line_equiv_1b,
+    ):
+        """
+        Test if the evaluation of PDDL problem descriptions is correct.
+        """
+        def print_diff(desc1, desc2):
+            full_1 = planetarium.oracle.fully_specify(planetarium.builder.build(desc1))
+            full_2 = planetarium.oracle.fully_specify(planetarium.builder.build(desc2))
+            print([p for p in full_1.goal().predicates if p not in full_2.goal().predicates])
+            print([p for p in full_2.goal().predicates if p not in full_1.goal().predicates])
+        def print_diff_init(desc1, desc2):
+            full_1 = planetarium.oracle.fully_specify(planetarium.builder.build(desc1))
+            full_2 = planetarium.oracle.fully_specify(planetarium.builder.build(desc2))
+            print([p for p in full_1.init().predicates if p not in full_2.init().predicates])
+            print([p for p in full_2.init().predicates if p not in full_1.init().predicates])
+
+        with subtests.test("rover_single_line_equiv equals rover_single_line_equiva"):
+            print_diff(rover_single_line_equiv, rover_single_line_equiva)
+            assert all(
+                planetarium.evaluate(
+                    rover_single_line_equiv,
+                    rover_single_line_equiva,
+                )
+            )
+
+        descs = {
+            "rover_single_line_equiv_1": rover_single_line_equiv_1,
+            "rover_single_line_equiv_1a": rover_single_line_equiv_1a,
+            "rover_single_line_equiv_1b": rover_single_line_equiv_1b,
+        }
+        for (name1, desc1), (name2, desc2) in product(descs.items(), descs.items()):
+            with subtests.test(f"{name1} equals {name2}"):
+                assert all(planetarium.evaluate(desc1, desc2))
 
 
 class TestUnsupportedDomain:

@@ -299,7 +299,6 @@ def rover_subgraph(scene: ReducedSceneGraph) -> ReducedSceneGraph:
                 subgraph.add_edge(v, u, copy.deepcopy(edge))
                 # add visible edges from waypoint to lander
                 for waypoint, in_edge in scene.in_edges(v):
-                    # print(in_edge, waypoint.node, u.node, "IN EDGE")
                     if in_edge.predicate == "visible":
                         subgraph.add_edge(waypoint, u, copy.deepcopy(in_edge))
 
@@ -406,7 +405,7 @@ def _fully_specify_rover_single(
     for pred in inflated_goal.predicates:
         params = pred["parameters"]
         match pred["typing"].split("_"):
-            case [_, sample, _] if sample in ("rock", "soil", "image"):
+            case ["communicated", sample, "data"]:
                 have_pred = {
                     "typing": f"have_{sample}{'_analysis' if sample != 'image' else ''}",
                     "parameters": params,
@@ -424,7 +423,6 @@ def _fully_specify_rover_single(
     for pred in inflated_goal.predicates:
         match pred["typing"].split("_"):
             case ["have", sample, *_] if sample in ("rock", "soil", "image"):
-                print(pred)
                 waypoint = pred["parameters"][0]
                 # check if the rover needs to communicate the data
                 com_pred = {

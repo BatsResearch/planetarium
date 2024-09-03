@@ -17,7 +17,11 @@ from .oracles.gripper import (
     _fully_specify_gripper,
     _plan_gripper,
 )
-from .oracles.rover_single import _reduce_rover_single, _inflate_rover_single, _fully_specify_rover_single
+from .oracles.rover_single import (
+    _reduce_rover_single,
+    _inflate_rover_single,
+    _fully_specify_rover_single,
+)
 
 
 plan_template = jinja.Template(

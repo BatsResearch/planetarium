@@ -203,16 +203,27 @@ class TestRoverSingleOracle:
         """
         descs = [
             ("rover_single_line_fully_specified", rover_single_line_fully_specified),
-            ("rover_single_line_fully_specified_1", rover_single_line_fully_specified_1),
-            ("rover_single_line_fully_specified_2", rover_single_line_fully_specified_2),
-            ("rover_single_line_fully_specified_3", rover_single_line_fully_specified_3),
-            ("rover_single_line_fully_specified_4", rover_single_line_fully_specified_4),
+            (
+                "rover_single_line_fully_specified_1",
+                rover_single_line_fully_specified_1,
+            ),
+            (
+                "rover_single_line_fully_specified_2",
+                rover_single_line_fully_specified_2,
+            ),
+            (
+                "rover_single_line_fully_specified_3",
+                rover_single_line_fully_specified_3,
+            ),
+            (
+                "rover_single_line_fully_specified_4",
+                rover_single_line_fully_specified_4,
+            ),
         ]
         for name, desc in descs:
             with subtests.test(name):
                 problem = builder.build(desc)
                 full = oracle.fully_specify(problem)
-                print([pred for pred in full.goal().predicates if pred not in problem.goal().predicates])
                 assert full == problem, name
                 assert oracle.fully_specify(full) == full, name
 

@@ -290,7 +290,12 @@ class TestMetrics:
                 assert not metric.equals(p2, p1, is_placeholder=True)
                 assert not metric.equals(p2, p1, is_placeholder=False)
 
-    def test_rover_single_eqquivalence(self, subtests, rover_single_line_fully_specified_4, rover_single_line_fully_specified_4a,):
+    def test_rover_single_eqquivalence(
+        self,
+        subtests,
+        rover_single_line_fully_specified_4,
+        rover_single_line_fully_specified_4a,
+    ):
         """Test the equivalence of rover single line problems."""
         p1 = builder.build(rover_single_line_fully_specified_4)
         p2 = builder.build(rover_single_line_fully_specified_4a)
