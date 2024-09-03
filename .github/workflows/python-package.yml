@@ -36,6 +36,9 @@ jobs:
           path: tmp/
           key: downward-${{ runner.os }}-${{ hashFiles('**/VAL.zip') }}-${{ hashFiles('fast-downward.sif') }}
 
+      - name: Setup apptainer
+        uses: eWaterCycle/setup-apptainer@v2.0.0
+
       - name: install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-root
@@ -60,9 +63,6 @@ jobs:
           poetry run black --check planetarium/. tests/.
           poetry ruff planetarium/.
           poetry mypy planetarium/.
-
-      - name: Setup apptainer
-        uses: eWaterCycle/setup-apptainer@v2.0.0
 
       - name: test
         run: |
