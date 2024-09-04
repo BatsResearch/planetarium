@@ -298,19 +298,8 @@ class TestEvaluate:
         """
         Test if the evaluation of PDDL problem descriptions is correct.
         """
-        def print_diff(desc1, desc2):
-            full_1 = planetarium.oracle.fully_specify(planetarium.builder.build(desc1))
-            full_2 = planetarium.oracle.fully_specify(planetarium.builder.build(desc2))
-            print([p for p in full_1.goal().predicates if p not in full_2.goal().predicates])
-            print([p for p in full_2.goal().predicates if p not in full_1.goal().predicates])
-        def print_diff_init(desc1, desc2):
-            full_1 = planetarium.oracle.fully_specify(planetarium.builder.build(desc1))
-            full_2 = planetarium.oracle.fully_specify(planetarium.builder.build(desc2))
-            print([p for p in full_1.init().predicates if p not in full_2.init().predicates])
-            print([p for p in full_2.init().predicates if p not in full_1.init().predicates])
 
         with subtests.test("rover_single_line_equiv equals rover_single_line_equiva"):
-            print_diff(rover_single_line_equiv, rover_single_line_equiva)
             assert all(
                 planetarium.evaluate(
                     rover_single_line_equiv,

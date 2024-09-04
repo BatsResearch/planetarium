@@ -1,27 +1,12 @@
+from typing import Callable
+
 import jinja2 as jinja
 from pddl.core import Action
-import rustworkx as rx
 
 from planetarium import graph
 
 from .reduced_graph import ReducedSceneGraph, ReducedProblemGraph
-from .oracles.blocksworld import (
-    _reduce_blocksworld,
-    _inflate_blocksworld,
-    _fully_specify_blocksworld,
-    _plan_blocksworld,
-)
-from .oracles.gripper import (
-    _reduce_gripper,
-    _inflate_gripper,
-    _fully_specify_gripper,
-    _plan_gripper,
-)
-from .oracles.rover_single import (
-    _reduce_rover_single,
-    _inflate_rover_single,
-    _fully_specify_rover_single,
-)
+from .oracles import ORACLES
 
 
 plan_template = jinja.Template(
@@ -51,15 +36,9 @@ def reduce(
         ReducedGraph: The reduced problem graph.
     """
     domain = domain or graph.domain
-    match domain:
-        case "blocksworld":
-            return _reduce_blocksworld(graph)
-        case "gripper":
-            return _reduce_gripper(graph)
-        case "rover-single":
-            return _reduce_rover_single(graph)
-        case _:
-            raise DomainNotSupportedError(f"Domain {domain} not supported.")
+    if oracle := ORACLES.get(domain):
+        return oracle.reduce(graph)
+    raise DomainNotSupportedError(f"Domain {domain} not supported.")
 
 
 def inflate(
@@ -77,22 +56,16 @@ def inflate(
         graph.SceneGraph: The respecified, inflated scene graph.
     """
     domain = domain or scene._domain
-    match domain:
-        case "blocksworld":
-            return _inflate_blocksworld(scene)
-        case "gripper":
-            return _inflate_gripper(scene)
-        case "rover-single":
-            return _inflate_rover_single(scene)
-        case _:
-            raise DomainNotSupportedError(f"Domain {domain} not supported.")
+    if oracle := ORACLES.get(domain):
+        return oracle.inflate(scene)
+    raise DomainNotSupportedError(f"Domain {domain} not supported.")
 
 
 def fully_specify(
     problem: graph.ProblemGraph,
     domain: str | None = None,
     return_reduced: bool = False,
-) -> graph.ProblemGraph:
+) -> graph.ProblemGraph | ReducedProblemGraph:
     """Fully specifies a goal state.
 
     Args:
@@ -108,31 +81,9 @@ def fully_specify(
     """
     domain = domain or problem.domain
 
-    match domain:
-        case "blocksworld":
-            reduced_init, reduced_goal = _reduce_blocksworld(problem).decompose()
-            fully_specified_goal = _fully_specify_blocksworld(reduced_goal)
-        case "gripper":
-            reduced_init, reduced_goal = _reduce_gripper(problem).decompose()
-            fully_specified_goal = _fully_specify_gripper(
-                reduced_init,
-                reduced_goal,
-            )
-        case "rover-single":
-            reduced_init, fully_specified_goal = _fully_specify_rover_single(
-                *problem.decompose()
-            )
-        case _:
-            raise DomainNotSupportedError(f"Domain {domain} not supported.")
-
-    if return_reduced:
-        return ReducedProblemGraph.join(reduced_init, fully_specified_goal)
-    else:
-        init, _ = problem.decompose()
-        return graph.ProblemGraph.join(
-            init,
-            inflate(fully_specified_goal, domain=domain),
-        )
+    if oracle := ORACLES.get(domain):
+        return oracle.fully_specify(problem, return_reduced=return_reduced)
+    raise DomainNotSupportedError(f"Domain {domain} not supported.")
 
 
 def plan(problem: graph.ProblemGraph, domain: str | None = None) -> list[Action]:
@@ -145,14 +96,9 @@ def plan(problem: graph.ProblemGraph, domain: str | None = None) -> list[Action]
         str: The sequence of actions to solve the problem.
     """
     domain = domain or problem.domain
-    problem = fully_specify(problem, domain=domain, return_reduced=True)
-    match domain:
-        case "blocksworld":
-            return _plan_blocksworld(problem)
-        case "gripper":
-            return _plan_gripper(problem)
-        case _:
-            raise DomainNotSupportedError(f"Domain {domain} not supported.")
+    if oracle := ORACLES.get(domain):
+        return oracle.plan(problem)
+    raise DomainNotSupportedError(f"Domain {domain} not supported.")
 
 
 def plan_to_string(actions: list[Action]) -> str:

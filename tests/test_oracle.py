@@ -22,6 +22,9 @@ from .problem_fixtures import (
     rover_single_line_fully_specified_2,
     rover_single_line_fully_specified_3,
     rover_single_line_fully_specified_4,
+    floortile_fully_specified,
+    floortile_underspecified_directions,
+    floortile_no_white1,
 )
 
 
@@ -226,6 +229,46 @@ class TestRoverSingleOracle:
                 full = oracle.fully_specify(problem)
                 assert full == problem, name
                 assert oracle.fully_specify(full) == full, name
+
+
+class TestFloorTileOracle:
+    """
+    Test suite for the floor tile oracle.
+    """
+
+    def test_fully_specified(
+        self,
+        subtests,
+        floortile_fully_specified,
+        floortile_no_white1,
+    ):
+        """
+        Test the fully specified floor tile problem.
+        """
+        descs = {
+            "floortile_fully_specified": floortile_fully_specified,
+            "floortile_no_white1": floortile_no_white1,
+        }
+        for name, desc in descs.items():
+            problem = builder.build(desc)
+            full = oracle.fully_specify(problem)
+            with subtests.test(name):
+
+                print(
+                    "teehee",
+                    [v for v in full.goal().nodes if v not in problem.goal().nodes],
+                )
+                assert full == problem, name
+                assert oracle.fully_specify(full) == full, name
+
+    def test_under_specified(self, floortile_underspecified_directions):
+        """
+        Test the under specified floor tile problem.
+        """
+        problem = builder.build(floortile_underspecified_directions)
+        full = oracle.fully_specify(problem)
+        assert oracle.fully_specify(full) == full
+        assert full != problem
 
 
 class TestUnsupportedDomain:
