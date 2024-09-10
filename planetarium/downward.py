@@ -20,7 +20,8 @@ def _get_best_plan(plan_filepath: str) -> tuple[str | None, float]:
     best_cost = float("inf")
     best_plan = None
 
-    for plan_fp in glob.glob(f"{plan_filepath}.*"):
+    for plan_fp in glob.glob(f"{plan_filepath}*"):
+        print(plan_fp)
         with open(plan_fp, "r") as f:
             *pddl_plan, cost_str = f.readlines()
             match = re.search(r"cost = ([-\d\.]+)", cost_str)

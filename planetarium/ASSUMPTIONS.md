@@ -30,3 +30,10 @@ Rover has the capability of being a much more complex domain, but for the purpos
 
 `:init` conditions:
 - No double `at_*` predicates (rover and lander can only be in one location at a time)
+
+## Floortile
+
+Generally, all valid problems with reachable goal states are evaluable.
+
+`:init` conditions:
+- No robot has two colors (`robot-has`)

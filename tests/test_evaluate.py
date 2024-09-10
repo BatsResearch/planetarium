@@ -14,6 +14,14 @@ from .problem_fixtures import (
     rover_single_line_equiv_1,
     rover_single_line_equiv_1a,
     rover_single_line_equiv_1b,
+    floortile_no_white1,
+    floortile_no_white1a,
+    floortile_disconnected_tile1,
+    floortile_disconnected_tile1a,
+    floortile_one_color_one_robot1,
+    floortile_one_color_one_robot1a,
+    floortile_no_available_colors,
+    floortile_no_available_colors_a,
 )
 
 
@@ -298,23 +306,13 @@ class TestEvaluate:
         """
         Test if the evaluation of PDDL problem descriptions is correct.
         """
-        def print_diff(desc1, desc2):
-            full_1 = planetarium.oracle.fully_specify(planetarium.builder.build(desc1))
-            full_2 = planetarium.oracle.fully_specify(planetarium.builder.build(desc2))
-            print([p for p in full_1.goal().predicates if p not in full_2.goal().predicates])
-            print([p for p in full_2.goal().predicates if p not in full_1.goal().predicates])
-        def print_diff_init(desc1, desc2):
-            full_1 = planetarium.oracle.fully_specify(planetarium.builder.build(desc1))
-            full_2 = planetarium.oracle.fully_specify(planetarium.builder.build(desc2))
-            print([p for p in full_1.init().predicates if p not in full_2.init().predicates])
-            print([p for p in full_2.init().predicates if p not in full_1.init().predicates])
 
         with subtests.test("rover_single_line_equiv equals rover_single_line_equiva"):
-            print_diff(rover_single_line_equiv, rover_single_line_equiva)
             assert all(
                 planetarium.evaluate(
                     rover_single_line_equiv,
                     rover_single_line_equiva,
+                    alias="lama-first",
                 )
             )
 
@@ -325,7 +323,44 @@ class TestEvaluate:
         }
         for (name1, desc1), (name2, desc2) in product(descs.items(), descs.items()):
             with subtests.test(f"{name1} equals {name2}"):
-                assert all(planetarium.evaluate(desc1, desc2))
+                assert all(planetarium.evaluate(desc1, desc2, alias="lama-first"))
+
+    def test_floortile_equivalent(
+        self,
+        subtests,
+        floortile_no_white1,
+        floortile_no_white1a,
+        floortile_disconnected_tile1,
+        floortile_disconnected_tile1a,
+        floortile_one_color_one_robot1,
+        floortile_one_color_one_robot1a,
+        floortile_no_available_colors,
+        floortile_no_available_colors_a,
+    ):
+        """
+        Test if the evaluation of PDDL problem descriptions is correct.
+        """
+        descs = {
+            "floortile_no_white1": floortile_no_white1,
+            "floortile_no_white1a": floortile_no_white1a,
+            "floortile_disconnected_tile1": floortile_disconnected_tile1,
+            "floortile_disconnected_tile1a": floortile_disconnected_tile1a,
+            "floortile_one_color_one_robot1": floortile_one_color_one_robot1,
+            "floortile_one_color_one_robot1a": floortile_one_color_one_robot1a,
+            "floortile_no_available_colors": floortile_no_available_colors,
+            "floortile_no_available_colors_a": floortile_no_available_colors_a,
+        }
+        equiv_pairs = [
+            ("floortile_no_white1", "floortile_no_white1a"),
+            ("floortile_disconnected_tile1", "floortile_disconnected_tile1a"),
+            ("floortile_one_color_one_robot1", "floortile_one_color_one_robot1a"),
+            ("floortile_no_available_colors", "floortile_no_available_colors_a"),
+        ]
+
+        for n1, n2 in equiv_pairs:
+            test_name = f"{n2} equals {n1}"
+            with subtests.test(test_name):
+                assert all(planetarium.evaluate(descs[n1], descs[n2], alias="lama-first"))
 
 
 class TestUnsupportedDomain:

@@ -64,7 +64,7 @@ def evaluate(
     if check_solveable and isinstance(domain_str, str):
         try:
             plan_str = oracle.plan_to_string(oracle.plan(target_graph))
-        except oracle.DomainNotSupportedError:
+        except (oracle.DomainNotSupportedError, NotImplementedError):
             try:
                 plan_str, _ = downward.plan(
                     domain_str,

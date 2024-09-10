@@ -22,6 +22,16 @@ from .problem_fixtures import (
     rover_single_line_fully_specified_2,
     rover_single_line_fully_specified_3,
     rover_single_line_fully_specified_4,
+    floortile_fully_specified,
+    floortile_underspecified_directions,
+    floortile_no_white1,
+    floortile_no_white1a,
+    floortile_no_white2,
+    floortile_no_available_colors,
+    floortile_disconnected_tile_no_white,
+    floortile_disconnected_tile1,
+    floortile_disconnected_tile1a,
+    floortile_one_color_one_robot1,
 )
 
 
@@ -226,6 +236,140 @@ class TestRoverSingleOracle:
                 full = oracle.fully_specify(problem)
                 assert full == problem, name
                 assert oracle.fully_specify(full) == full, name
+
+    def test_inflate(
+        self,
+        subtests,
+        rover_single_line_fully_specified,
+        rover_single_line_fully_specified_1,
+        rover_single_line_fully_specified_2,
+        rover_single_line_fully_specified_3,
+        rover_single_line_fully_specified_4,
+    ):
+        """
+        Test the inflate function.
+        """
+        descs = [
+            ("rover_single_line_fully_specified", rover_single_line_fully_specified),
+            (
+                "rover_single_line_fully_specified_1",
+                rover_single_line_fully_specified_1,
+            ),
+            (
+                "rover_single_line_fully_specified_2",
+                rover_single_line_fully_specified_2,
+            ),
+            (
+                "rover_single_line_fully_specified_3",
+                rover_single_line_fully_specified_3,
+            ),
+            (
+                "rover_single_line_fully_specified_4",
+                rover_single_line_fully_specified_4,
+            ),
+        ]
+        for name, desc in descs:
+            problem = builder.build(desc)
+            init, goal = problem.decompose()
+            with subtests.test(name):
+                assert reduce_and_inflate(init)
+                assert reduce_and_inflate(goal)
+                assert reduce_and_inflate(problem)
+
+
+class TestFloorTileOracle:
+    """
+    Test suite for the floor tile oracle.
+    """
+
+    def test_fully_specified(
+        self,
+        subtests,
+        floortile_fully_specified,
+        floortile_no_white1,
+        floortile_no_white2,
+        floortile_no_available_colors,
+        floortile_disconnected_tile_no_white,
+        floortile_disconnected_tile1,
+        floortile_one_color_one_robot1,
+    ):
+        """
+        Test the fully specified floor tile problem.
+        """
+        descs = {
+            "floortile_fully_specified": floortile_fully_specified,
+            "floortile_no_white1": floortile_no_white1,
+            "floortile_no_white2": floortile_no_white2,
+            "floortile_no_available_colors": floortile_no_available_colors,
+            "floortile_disconnected_tile_no_white": floortile_disconnected_tile_no_white,
+            "floortile_disconnected_tile1": floortile_disconnected_tile1,
+            "floortile_one_color_one_robot1": floortile_one_color_one_robot1,
+        }
+        for name, desc in descs.items():
+            problem = builder.build(desc)
+            full = oracle.fully_specify(problem)
+            with subtests.test(name):
+                assert full == problem, name
+                assert oracle.fully_specify(full) == full, name
+
+    def test_under_specified(
+        self,
+        subtests,
+        floortile_underspecified_directions,
+        floortile_no_white1a,
+        floortile_disconnected_tile1a,
+    ):
+        """
+        Test the under specified floor tile problem.
+        """
+        descs = {
+            "floortile_underspecified_directions": floortile_underspecified_directions,
+            "floortile_no_white1a": floortile_no_white1a,
+            "floortile_disconnected_tile1a": floortile_disconnected_tile1a,
+        }
+        for name, desc in descs.items():
+            problem = builder.build(desc)
+            full = oracle.fully_specify(problem)
+            with subtests.test(name):
+                assert full != problem, name
+                assert oracle.fully_specify(full) == full, name
+
+    def test_infalte(
+        self,
+        subtests,
+        floortile_fully_specified,
+        floortile_no_white1,
+        floortile_no_white2,
+        floortile_no_available_colors,
+        floortile_disconnected_tile_no_white,
+        floortile_disconnected_tile1,
+        floortile_one_color_one_robot1,
+        floortile_underspecified_directions,
+        floortile_no_white1a,
+        floortile_disconnected_tile1a,
+    ):
+        """
+        Test the inflate function.
+        """
+        descs = {
+            "floortile_fully_specified": floortile_fully_specified,
+            "floortile_no_white1": floortile_no_white1,
+            "floortile_no_white2": floortile_no_white2,
+            "floortile_no_available_colors": floortile_no_available_colors,
+            "floortile_disconnected_tile_no_white": floortile_disconnected_tile_no_white,
+            "floortile_disconnected_tile1": floortile_disconnected_tile1,
+            "floortile_one_color_one_robot1": floortile_one_color_one_robot1,
+            "floortile_underspecified_directions": floortile_underspecified_directions,
+            "floortile_no_white1a": floortile_no_white1a,
+            "floortile_disconnected_tile1a": floortile_disconnected_tile1a,
+        }
+        for name, desc in descs.items():
+            problem = builder.build(desc)
+            init, goal = problem.decompose()
+            with subtests.test(name):
+                assert reduce_and_inflate(init)
+                assert reduce_and_inflate(goal)
+                assert reduce_and_inflate(problem)
 
 
 class TestUnsupportedDomain:

@@ -91,9 +91,7 @@ def _edge_matching(
     """
 
     def _getattr(obj, attr):
-        v = getattr(obj, attr, attributes[attr])
-        if v is None:
-            v = attributes[attr]
+        v = getattr(obj, attr, attributes.get(attr))
         return v
 
     return all(_getattr(source, attr) == _getattr(target, attr) for attr in attributes)
