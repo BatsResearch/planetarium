@@ -97,3 +97,6 @@ Below is a flowchart providing an overview of the equivalence algorithm:
 <p align="center">(Left) Two planning problems, in PDDL problem description, real-world scenario, and graph representations. (Center) Fully specified graph representation. (Right) Graph isomorphism.</p>
 
 The key to this algorithm working is building a specially crafted "fully specify" function, which we build for each domain that we want to support. We provide implementations for the `blocksworld` and `gripper` domains in the `planetarium.oracle` module.
+
+## Adding a new domain
+For adding a new domain, please take a look at [this guide](EXTENDING.md).
