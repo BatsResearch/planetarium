@@ -20,7 +20,6 @@ class Oracle(abc.ABC):
         Returns:
             ReducedSceneGraph | ReducedProblemGraph: The reduced scene graph.
         """
-        pass
 
     @staticmethod
     @abc.abstractmethod
@@ -35,7 +34,6 @@ class Oracle(abc.ABC):
         Returns:
             SceneGraph | ProblemGraph: The inflated scene graph.
         """
-        pass
 
     @staticmethod
     @abc.abstractmethod
@@ -53,7 +51,6 @@ class Oracle(abc.ABC):
         Returns:
             ProblemGraph | ReducedProblemGraph: The fully specified problem graph.
         """
-        pass
 
     @staticmethod
     def plan(problem: graph.ProblemGraph) -> list[Action]:

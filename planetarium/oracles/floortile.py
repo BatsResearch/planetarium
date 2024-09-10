@@ -1,6 +1,9 @@
 from collections import defaultdict
 import copy
 
+from pddl.core import Action
+import rustworkx as rx
+
 from . import oracle
 from .. import graph
 from ..reduced_graph import ReducedSceneGraph, ReducedProblemGraph, ReducedNode
@@ -8,9 +11,7 @@ from ..reduced_graph import ReducedSceneGraph, ReducedProblemGraph, ReducedNode
 # Add the ReducedNode enum for the gripper domain
 ReducedNode.register(
     {
-        "CLEAR": "clear",
         "AVAILABLE": "available-color",
-        "FREE": "free-color",
     },
     "floor-tile",
 )
@@ -58,7 +59,6 @@ class FloorTileOracle(oracle.Oracle):
                 raise ValueError("Scene must be a SceneGraph or ProblemGraph.")
 
         for predicate in predicates:
-            print("test", predicate, type(predicate))
             params = predicate["parameters"]
             reduced_edge = graph.PlanGraphEdge(
                 predicate=predicate["typing"],
@@ -71,8 +71,6 @@ class FloorTileOracle(oracle.Oracle):
                     reduced.add_edge(ReducedNode.CLEAR, x, reduced_edge)
                 case ("available-color", [x]):
                     reduced.add_edge(ReducedNode.AVAILABLE, x, reduced_edge)
-                case ("free-color", [x]):
-                    reduced.add_edge(ReducedNode.FREE, x, reduced_edge)
 
         return reduced
 
@@ -144,14 +142,14 @@ class FloorTileOracle(oracle.Oracle):
             "up",
             "right",
             "painted",
-            "free-color",
             "available-color",
         }
         for u, v, edge in init.edges:
             if edge.predicate in unchangeable:
                 edge = copy.deepcopy(edge)
                 edge.scene = graph.Scene.GOAL
-                goal.add_edge(u, v, edge)
+                if not goal.has_edge(u, v, edge):
+                    goal.add_edge(u, v, edge)
 
     @staticmethod
     def _fixed_color_predicates(
@@ -180,9 +178,10 @@ class FloorTileOracle(oracle.Oracle):
                     scene=graph.Scene.GOAL,
                 )
                 for color in colors:
-                    goal.add_edge(robot, color, edge)
+                    if not goal.has_edge(robot, color, edge):
+                        goal.add_edge(robot, color, edge)
         # if only one color is available:
-        if len(available_colors) == 1:
+        elif len(available_colors) == 1:
             # if there is only one robot and it either
             # a) has the available color
             # b) the available color needs to be painted
@@ -197,7 +196,8 @@ class FloorTileOracle(oracle.Oracle):
                         predicate="robot-has",
                         scene=graph.Scene.GOAL,
                     )
-                    goal.add_edge(robot, robot_color, edge)
+                    if not goal.has_edge(robot, robot_color, edge):
+                        goal.add_edge(robot, robot_color, edge)
                 else:
                     painted_colors = set()
                     for u, v, edge in goal.edges:
@@ -211,7 +211,8 @@ class FloorTileOracle(oracle.Oracle):
                             predicate="robot-has",
                             scene=graph.Scene.GOAL,
                         )
-                        goal.add_edge(robot, available_color, edge)
+                        if not goal.has_edge(robot, available_color, edge):
+                            goal.add_edge(robot, available_color, edge)
             else:
                 # if there are more than one robot, every robot that already has that
                 # color must keep it
@@ -221,14 +222,54 @@ class FloorTileOracle(oracle.Oracle):
                             predicate="robot-has",
                             scene=graph.Scene.GOAL,
                         )
-                        goal.add_edge(robot, available_color, edge)
-                # if there are no robots with the available color, we can't
-                # determine the robot color (any one of them can switch to it)
+                        if not goal.has_edge(robot, available_color, edge):
+                            goal.add_edge(robot, available_color, edge)
+
+                # for each node that needs to be painted the available_color,
+                # if there is only one robot that can paint it, then that robot
+                # must paint end with that color
+                painted_nodes = []
+                node_reachable_by: list[list] = []
+
+                subgraph_nodes = [
+                    i
+                    for i, n in enumerate(goal.nodes)
+                    if n.typing in ({"tile"}, {"robot"})
+                ]
+                subgraph = init.graph.subgraph(subgraph_nodes).to_undirected()
+                print('subgraph', subgraph.nodes())
+
+                for u, v, edge in goal.edges:
+                    if edge.predicate == "painted":
+                        painted_nodes.append(u)
+                        reachable = []
+                        # find all robots that can reach this node
+                        for robot in robots:
+                            robot_idx = subgraph.nodes().index(robot)
+                            u_idx = subgraph.nodes().index(u)
+
+                            if rx.has_path(subgraph, robot_idx, u_idx):
+                                reachable.append(robot)
+                        node_reachable_by.append(reachable)
+
+                for r in node_reachable_by:
+                    # if there's only one robot that can paint it, then it must end up
+                    # painting it
+                    if len(r) == 1:
+                        robot = r[0]
+                        # assign the robot the only available color
+                        # (notice branch above ensures there's only one available color)
+                        edge = graph.PlanGraphEdge(
+                            predicate="robot-has",
+                            scene=graph.Scene.GOAL,
+                        )
+                        if not goal.has_edge(robot, available_color, edge):
+                            goal.add_edge(robot, available_color, edge)
 
     def _fix_possible_positions(
         init: ReducedSceneGraph,
         goal: ReducedSceneGraph,
-        robots: list[ReducedNode],
+        robots: list[graph.PlanGraphNode],
     ):
         for robot in robots:
             init_pos = [
@@ -243,9 +284,10 @@ class FloorTileOracle(oracle.Oracle):
                 # specified, we can't determine the final robot position
                 continue
 
+            init_pos = init_pos[0]
             pos_neighbors = [
                 v
-                for v, edge in init.out_edges(init_pos[0])
+                for v, edge in (*init.out_edges(init_pos), *init.in_edges(init_pos))
                 if edge.predicate in {"up", "right"}
             ]
 
@@ -255,7 +297,8 @@ class FloorTileOracle(oracle.Oracle):
                     predicate="robot-at",
                     scene=graph.Scene.GOAL,
                 )
-                goal.add_edge(robot, init_pos[0], edge)
+                if not goal.has_edge(robot, init_pos, edge):
+                    goal.add_edge(robot, init_pos, edge)
 
     # TODO: if a robot is the only one that can paint a tile, it must end up painting it
     # if a robot ends up on a tile that is disconnected, then it must end up on that tile:
@@ -286,7 +329,6 @@ class FloorTileOracle(oracle.Oracle):
 
         # if a robot that starts on a tile with no neighbors, it must also end
         # on that tile
-        # TODO
         FloorTileOracle._fix_possible_positions(init, goal, robots)
 
         if return_reduced:
