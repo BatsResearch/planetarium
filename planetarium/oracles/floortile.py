@@ -237,7 +237,6 @@ class FloorTileOracle(oracle.Oracle):
                     if n.typing in ({"tile"}, {"robot"})
                 ]
                 subgraph = init.graph.subgraph(subgraph_nodes).to_undirected()
-                print('subgraph', subgraph.nodes())
 
                 for u, v, edge in goal.edges:
                     if edge.predicate == "painted":

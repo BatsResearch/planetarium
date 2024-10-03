@@ -12,80 +12,10 @@ from pddl import formatter as pddl_formatter
 from pddl.core import And, Constant, Domain, Predicate
 from pddl.parser import domain as domain_parser
 
+from planetarium import DOMAINS
+
 import tqdm
 
-DOMAINS = {
-    "blocksworld": """;; source: https://github.com/AI-Planning/pddl-generators/blob/main/blocksworld/domain.pddl
-    ;; same as used in IPC 2023
-    ;;
-    (define (domain blocksworld)
-
-    (:requirements :strips)
-
-    (:predicates (clear ?x)
-                (on-table ?x)
-                (arm-empty)
-                (holding ?x)
-                (on ?x ?y))
-
-    (:action pickup
-    :parameters (?ob)
-    :precondition (and (clear ?ob) (on-table ?ob) (arm-empty))
-    :effect (and (holding ?ob) (not (clear ?ob)) (not (on-table ?ob))
-                (not (arm-empty))))
-
-    (:action putdown
-    :parameters  (?ob)
-    :precondition (holding ?ob)
-    :effect (and (clear ?ob) (arm-empty) (on-table ?ob)
-                (not (holding ?ob))))
-
-    (:action stack
-    :parameters  (?ob ?underob)
-    :precondition (and (clear ?underob) (holding ?ob))
-    :effect (and (arm-empty) (clear ?ob) (on ?ob ?underob)
-                (not (clear ?underob)) (not (holding ?ob))))
-
-    (:action unstack
-    :parameters  (?ob ?underob)
-    :precondition (and (on ?ob ?underob) (clear ?ob) (arm-empty))
-    :effect (and (holding ?ob) (clear ?underob)
-                (not (on ?ob ?underob)) (not (clear ?ob)) (not (arm-empty)))))
-    """,
-    "gripper": """;; source: https://github.com/AI-Planning/pddl-generators/blob/main/gripper/domain.pddl
-    (define (domain gripper)
-       (:requirements :strips)
-       (:predicates (room ?r)
-            (ball ?b)
-            (gripper ?g)
-            (at-robby ?r)
-            (at ?b ?r)
-            (free ?g)
-            (carry ?o ?g))
-
-       (:action move
-           :parameters  (?from ?to)
-           :precondition (and  (room ?from) (room ?to) (at-robby ?from))
-           :effect (and  (at-robby ?to)
-                 (not (at-robby ?from))))
-
-       (:action pick
-           :parameters (?obj ?room ?gripper)
-           :precondition  (and  (ball ?obj) (room ?room) (gripper ?gripper)
-                    (at ?obj ?room) (at-robby ?room) (free ?gripper))
-           :effect (and (carry ?obj ?gripper)
-                (not (at ?obj ?room))
-                (not (free ?gripper))))
-
-       (:action drop
-           :parameters  (?obj  ?room ?gripper)
-           :precondition  (and  (ball ?obj) (room ?room) (gripper ?gripper)
-                    (carry ?obj ?gripper) (at-robby ?room))
-           :effect (and (at ?obj ?room)
-                (free ?gripper)
-                (not (carry ?obj ?gripper)))))
-    """,
-}
 
 SPLITS = None
 
@@ -197,7 +127,12 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
             """,
         )
 
-    def stack(self, blocks: list[Constant], *_, **kwargs) -> list[Predicate]:
+    def stack(
+        self,
+        blocks: list[Constant],
+        blocks_list: list[int] | None,
+        goal: bool = False,
+    ) -> list[Predicate]:
         predicates = [Predicate("arm-empty")]
         for i in range(1, len(blocks)):
             predicates.append(
@@ -213,7 +148,12 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
 
         return predicates
 
-    def on_table(self, blocks: list[Constant], *_, **kwargs) -> list[Predicate]:
+    def on_table(
+        self,
+        blocks: list[Constant],
+        blocks_list: list[int] | None,
+        goal: bool = False,
+    ) -> list[Predicate]:
         predicates = [Predicate("arm-empty")]
         for block in blocks:
             predicates.append(Predicate("clear", block))
@@ -221,7 +161,12 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
 
         return predicates
 
-    def holding_one(self, blocks: list[Constant], *_, **kwargs) -> list[Predicate]:
+    def holding_one(
+        self,
+        blocks: list[Constant],
+        blocks_list: list[int],
+        goal: bool = False,
+    ) -> list[Predicate]:
         predicates = [Predicate("holding", blocks[0])]
         for block in blocks[1:]:
             predicates.append(Predicate("clear", block))
@@ -229,11 +174,17 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
 
         return predicates
 
+    def _staircase_num_steps(self, num_blocks: int) -> int:
+        num_steps: float = (2 * num_blocks + 0.25) ** 0.5 - 0.5
+        if not num_steps.is_integer():
+            raise ValueError(f"Invalid number of blocks for staircase: {num_blocks}")
+        return int(num_steps)
+
     def staircase(
         self,
         blocks: list[Constant],
-        *_,
-        **kwargs,
+        blocks_list: list[int] | None,
+        goal: bool = False,
     ) -> list[Predicate]:
         predicates = [Predicate("arm-empty")]
         idx = 0
@@ -255,39 +206,38 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
             heights = [5, 4, 3, 2, 1]
             for height in heights:
                 if num_blocks % height == 0:
-                    num_blocks = [height] * (num_blocks // height)
-                    return num_blocks
+                    tower_heights = [height] * (num_blocks // height)
+                    return tower_heights
             return num_blocks
 
         if isinstance(num_blocks, int):
-            num_blocks = _get_height(num_blocks)
+            tower_heights = _get_height(num_blocks)
         elif isinstance(num_blocks, list) and len(num_blocks) == 1:
-            num_blocks = _get_height(num_blocks[0])
+            tower_heights = _get_height(num_blocks[0])
         elif isinstance(num_blocks, list) and any(
             n != num_blocks[0] for n in num_blocks
         ):
-            num_blocks = _get_height(sum(num_blocks))
+            tower_heights = _get_height(sum(num_blocks))
         else:
             raise ValueError("Invalid number of blocks for equal towers")
 
-        return num_blocks
+        return tower_heights
 
     def equal_towers(
         self,
         blocks: list[Constant],
-        num_blocks: int | list[int],
-        *_,
-        **kwargs,
+        blocks_list: list[int] | None,
+        goal: bool = False,
     ) -> list[Predicate]:
-        num_blocks = self._equal_towers(num_blocks)
-        assert sum(num_blocks) > 0, "Invalid number of blocks for equal towers"
+        tower_heights = self._equal_towers(blocks_list or len(blocks))
+        assert sum(tower_heights) > 0, "Invalid number of blocks for equal towers"
         predicates = [Predicate("arm-empty")]
         blocks_iter = iter(blocks)
 
-        for _ in range(len(num_blocks)):
+        for _ in range(len(tower_heights)):
             block = next(blocks_iter)
             predicates.append(Predicate("on-table", block))
-            for _ in range(num_blocks[0] - 1):
+            for _ in range(tower_heights[0] - 1):
                 next_block = next(blocks_iter)
                 predicates.append(Predicate("on", next_block, block))
                 block = next_block
@@ -298,12 +248,10 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
     def swap(
         self,
         blocks: list[Constant],
-        num_blocks: list[int],
-        *_,
+        blocks_list: list[int],
         goal: bool = False,
-        **kwargs,
     ) -> list[Predicate]:
-        if len(num_blocks) != 2 or num_blocks[0] < 2 or num_blocks[1] < 2:
+        if len(blocks_list) != 2 or blocks_list[0] < 2 or blocks_list[1] < 2:
             raise ValueError("Swap requires two towers with at least 2 blocks each")
 
         new_blocks = blocks
@@ -315,7 +263,7 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
         predicates.append(Predicate("on-table", blocks[1]))
 
         blocks_iter = iter(blocks[2:])
-        for i, num in enumerate(num_blocks):
+        for i, num in enumerate(blocks_list):
             block = blocks[i]
             for _ in range(num - 1):
                 next_block = next(blocks_iter)
@@ -328,22 +276,20 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
     def invert(
         self,
         blocks: list[Constant],
-        num_blocks: int | list[int],
-        *_,
+        blocks_list: list[int],
         goal: bool = False,
     ) -> list[Predicate]:
-        if isinstance(num_blocks, int):
-            num_blocks = [num_blocks]
-        if len(blocks) != sum(num_blocks):
+        blocks_list = blocks_list or [sum(blocks)]
+        if len(blocks) != sum(blocks_list):
             raise ValueError("Number of blocks does not match the sum of block counts")
 
         if goal:
             blocks = blocks[::-1]
-            num_blocks = num_blocks[::-1]
+            blocks_list = blocks_list[::-1]
 
         predicates = [Predicate("arm-empty")]
         idx = 0
-        for tower_height in num_blocks:
+        for tower_height in blocks_list:
             predicates.append(Predicate("clear", blocks[idx]))
             for _ in range(tower_height - 1):
                 idx += 1
@@ -356,18 +302,16 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
     def tower(
         self,
         blocks: list[Constant],
-        num_blocks: int | list[int],
-        *_,
-        **kwargs,
+        blocks_list: list[int],
+        goal: bool = False,
     ) -> list[Predicate]:
-        if isinstance(num_blocks, int):
-            num_blocks = [num_blocks]
-        if len(blocks) != sum(num_blocks):
+        blocks_list = blocks_list or [sum(blocks)]
+        if len(blocks) != sum(blocks_list):
             raise ValueError("Number of blocks does not match the sum of block counts")
 
         predicates = [Predicate("arm-empty")]
         idx = 0
-        for tower_height in num_blocks:
+        for tower_height in blocks_list:
             predicates.append(Predicate("clear", blocks[idx]))
             for _ in range(tower_height - 1):
                 idx += 1
@@ -377,18 +321,10 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
 
         return predicates
 
-    def _staircase_num_steps(self, num_blocks: int) -> int:
-        if isinstance(num_blocks, list):
-            num_blocks = sum(num_blocks)
-        num_steps = (2 * num_blocks + 0.25) ** 0.5 - 0.5
-        if not num_steps.is_integer():
-            raise ValueError(f"Invalid number of blocks for staircase: {num_blocks}")
-        return int(num_steps)
-
     def abstract_description(
         self,
         task: str,
-        num_blocks: int | list[int],
+        blocks_list: list[int],
         is_init: bool = False,
     ) -> str:
         """Generate an abstract description of the state.
@@ -406,11 +342,7 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
         Returns:
             str: State description.
         """
-        if isinstance(num_blocks, list):
-            blocks = num_blocks
-            num_blocks = sum(blocks)
-        else:
-            blocks = [num_blocks]
+        num_blocks = sum(blocks_list)
         match task, is_init:
             case ("on_table", True):
                 return f"You have {num_blocks} blocks, each laying directly on the table, and your arm is empty."
@@ -435,26 +367,26 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
                 return f"Your goal is to stack the blocks into {num_steps} stacks of increasing heights, starting with a stack of height 1."
 
             case ("equal_towers", True):
-                num_blocks = self._equal_towers(blocks)
-                return f"You have {sum(num_blocks)} blocks, b1 through b{sum(num_blocks)}, stacked into {len(blocks)} towers of equal heights, and your arm is empty."
+                num_blocks = self._equal_towers(blocks_list)
+                return f"You have {sum(num_blocks)} blocks, b1 through b{sum(num_blocks)}, stacked into {len(blocks_list)} towers of equal heights, and your arm is empty."
             case ("equal_towers", False):
-                num_blocks = self._equal_towers(blocks)
-                return f"Your goal is to stack the blocks into {len(blocks)} towers of equal heights."
+                num_blocks = self._equal_towers(blocks_list)
+                return f"Your goal is to stack the blocks into {len(blocks_list)} towers of equal heights."
 
             case ("swap", True):
-                return f"You have {num_blocks} blocks, b1 through b{num_blocks} in two towers with {blocks[0]} blocks in one and {blocks[1]} blocks in the other, and your arm is empty."
+                return f"You have {num_blocks} blocks, b1 through b{num_blocks} in two towers with {blocks_list[0]} blocks in one and {blocks_list[1]} blocks in the other, and your arm is empty."
             case ("swap", False):
                 return f"Your goal is to swap all blocks except the bottom blocks from one tower to the other."
 
             case ("invert", True):
-                return f"You have {num_blocks} blocks, stacked into {len(blocks)} towers of heights {', '.join(str(h) for h in blocks)}, and your arm is empty."
+                return f"You have {num_blocks} blocks, stacked into {len(blocks_list)} towers of heights {', '.join(str(h) for h in blocks_list)}, and your arm is empty."
             case ("invert", False):
                 return f"Your goal is to invert each individual stack of blocks, such that the block that in each tower that was originally on the bottom will be on the top."
 
             case ("tower", True):
-                return f"You have {num_blocks} blocks, stacked into {len(blocks)} towers of heights {', '.join(str(h) for h in blocks)}, and your arm is empty."
+                return f"You have {num_blocks} blocks, stacked into {len(blocks_list)} towers of heights {', '.join(str(h) for h in blocks_list)}, and your arm is empty."
             case ("tower", False):
-                return f"Your goal is to stack the blocks into a towers of heights {', '.join(str(h) for h in blocks)}."
+                return f"Your goal is to stack the blocks into a towers of heights {', '.join(str(h) for h in blocks_list)}."
             case _:
                 raise ValueError(f"Invalid task: {task}")
 
@@ -462,7 +394,7 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
         self,
         init: str,
         goal: str,
-        *args,
+        blocks_list: list[int],
         randomize: bool = True,
     ) -> tuple[Problem, dict[str, dict[str, str]], dict[str, str]]:
         """Generate a blocksworld task.
@@ -479,25 +411,24 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
                 descriptions, and data.
         """
 
-        (num_blocks,) = args
-        if isinstance(num_blocks, int):
-            total = num_blocks
-            num_blocks_str = str(num_blocks)
-        else:
-            total = sum(num_blocks)
-            num_blocks_str = "_".join(str(arg) for arg in num_blocks)
+        blocks_list_str = "_".join(str(arg) for arg in blocks_list)
+        num_blocks = sum(blocks_list)
 
-        constants = [Constant(f"b{i + 1}") for i in range(total)]
+        constants = [Constant(f"b{i + 1}") for i in range(num_blocks)]
 
-        init_predicates = getattr(self, init)(constants, num_blocks)
+        init_predicates = getattr(self, init)(
+            constants,
+            blocks_list=blocks_list,
+            goal=False,
+        )
         goal_predicates = getattr(self, goal)(
             constants,
-            num_blocks,
+            blocks_list=blocks_list,
             goal=True,
         )
 
         problem = Problem(
-            name=f"{init}_to_{goal}_{num_blocks_str}",
+            name=f"{init}_to_{goal}_{blocks_list_str}",
             domain=self.domain,
             objects=constants,
             init=init_predicates,
@@ -508,31 +439,27 @@ class BlocksworldDatasetGenerator(DatasetGenerator):
             "init": {
                 "abstract": self.abstract_description(
                     init,
+                    blocks_list=blocks_list,
                     is_init=True,
-                    num_blocks=num_blocks,
                 ),
                 "explicit": self.explicit_description(
                     init_predicates,
                     is_init=True,
                     randomize=randomize,
-                    num_blocks=(
-                        num_blocks if isinstance(num_blocks, int) else sum(num_blocks)
-                    ),
+                    num_blocks=num_blocks,
                 ),
             },
             "goal": {
                 "abstract": self.abstract_description(
                     goal,
+                    blocks_list=blocks_list,
                     is_init=False,
-                    num_blocks=num_blocks,
                 ),
                 "explicit": self.explicit_description(
                     goal_predicates,
                     is_init=False,
                     randomize=randomize,
-                    num_blocks=(
-                        num_blocks if isinstance(num_blocks, int) else sum(num_blocks)
-                    ),
+                    num_blocks=num_blocks,
                 ),
             },
         }
@@ -556,7 +483,7 @@ class GripperDatasetGenerator(DatasetGenerator):
             {%- if is_init -%}
                 You have {{ n_rooms }} rooms.
                 You have {{ n_balls }} balls.
-                You have 2 grippers.
+                You have {{ n_grippers }} grippers.
             {%- else -%}
                 Your goal is to have the following:
             {%- endif -%}
@@ -615,7 +542,8 @@ class GripperDatasetGenerator(DatasetGenerator):
         rooms: list[Constant],
         balls: list[Constant],
         grippers: list[Constant],
-        balls_count: list[int],
+        balls_in_grippers: list[int],
+        balls_in_rooms: list[int],
         *_,
         **kwargs,
     ) -> list[Predicate]:
@@ -630,10 +558,12 @@ class GripperDatasetGenerator(DatasetGenerator):
         Returns:
             list[Predicate]: List of predicates describing the state.
         """
+        if sum(balls_in_grippers) != 0:
+            raise ValueError("Grippers should not hold any balls in this task")
         predicates = [Predicate("free", gripper) for gripper in grippers]
         iter_balls = iter(balls)
 
-        for room, num_balls in zip(rooms, balls_count):
+        for room, num_balls in zip(rooms, balls_in_rooms):
             for _ in range(num_balls):
                 predicates.append(Predicate("at", next(iter_balls), room))
 
@@ -644,7 +574,7 @@ class GripperDatasetGenerator(DatasetGenerator):
         rooms: list[Constant],
         balls: list[Constant],
         grippers: list[Constant],
-        balls_count: list[int],
+        balls_in_rooms: list[int],
         *_,
         goal: bool = False,
         **kwargs,
@@ -665,18 +595,18 @@ class GripperDatasetGenerator(DatasetGenerator):
             ValueError: If there are less than 2 rooms or 2 balls.
             ValueError: If this is not a goal.
         """
-        if len(balls_count) < 2 or sum(balls_count) < 2:
+        if len(balls_in_rooms) < 2 or sum(balls_in_rooms) < 2:
             raise ValueError("Focus max requires at least 2 rooms and 2 balls")
         if not goal:
             raise ValueError("Focus max requires a goal state")
         # find maximum and its frequency
-        max_balls = max(balls_count)
-        counts = Counter(balls_count)
+        max_balls = max(balls_in_rooms)
+        counts = Counter(balls_in_rooms)
         if counts[max_balls] > 1:
             raise ValueError("Focus max requires unique max number of balls in a room")
 
         predicates = [Predicate("free", gripper) for gripper in grippers]
-        max_room = rooms[balls_count.index(max_balls)]
+        max_room = rooms[balls_in_rooms.index(max_balls)]
 
         for ball in balls:
             predicates.append(Predicate("at", ball, max_room))
@@ -688,7 +618,7 @@ class GripperDatasetGenerator(DatasetGenerator):
         rooms: list[Constant],
         balls: list[Constant],
         grippers: list[Constant],
-        balls_count: list[int],
+        balls_in_rooms: list[int],
         *_,
         goal: bool = False,
         **kwargs,
@@ -709,18 +639,18 @@ class GripperDatasetGenerator(DatasetGenerator):
             ValueError: If there are less than 2 rooms or 2 balls.
             ValueError: If this is not a goal.
         """
-        if len(balls_count) < 2 or sum(balls_count) < 2:
+        if len(balls_in_rooms) < 2 or sum(balls_in_rooms) < 2:
             raise ValueError("Focus min requires at least 2 rooms and 2 balls")
         if not goal:
             raise ValueError("Focus min requires a goal state")
         # find maximum and its frequency
-        min_balls = min(balls_count)
-        counts = Counter(balls_count)
+        min_balls = min(balls_in_rooms)
+        counts = Counter(balls_in_rooms)
         if counts[min_balls] > 1:
             raise ValueError("Focus min requires unique min number of balls in a room")
 
         predicates = [Predicate("free", gripper) for gripper in grippers]
-        min_room = rooms[balls_count.index(min_balls)]
+        min_room = rooms[balls_in_rooms.index(min_balls)]
 
         for ball in balls:
             predicates.append(Predicate("at", ball, min_room))
@@ -764,8 +694,8 @@ class GripperDatasetGenerator(DatasetGenerator):
         rooms: list[Constant],
         balls: list[Constant],
         grippers: list[Constant],
-        *_,
         goal: bool = False,
+        **_,
     ) -> list[Predicate]:
         """Task where balls are swapped between rooms.
 
@@ -793,12 +723,150 @@ class GripperDatasetGenerator(DatasetGenerator):
 
         return predicates
 
+    def juggle(
+        self,
+        rooms: list[Constant],
+        balls: list[Constant],
+        grippers: list[Constant],
+        balls_in_grippers: list[int],
+        balls_in_rooms: list[int],
+        goal: bool = False,
+    ) -> list[Predicate]:
+        # only first room can have balls
+        if sum(balls_in_rooms[1:]) != 0:
+            raise ValueError("Juggle requires all balls to be in the first room")
+
+        used_grippers = [i for i, v in enumerate(balls_in_grippers) if v > 0]
+        if len(used_grippers) < 2:
+            raise ValueError("Juggle requires at least 2 grippers with balls")
+
+        held_balls = balls[: len(used_grippers)]
+        if goal:
+            # rotate by 1
+            held_balls = held_balls[1:] + held_balls[:1]
+
+        predicates = []
+        for i, gripper in enumerate(grippers):
+            if i in used_grippers:
+                predicates.append(Predicate("carry", held_balls[i], gripper))
+            else:
+                predicates.append(Predicate("free", gripper))
+
+        for ball in balls[len(used_grippers) :]:
+            predicates.append(Predicate("at", ball, rooms[0]))
+
+        return predicates
+
+    def pickup(
+        self,
+        rooms: list[Constant],
+        balls: list[Constant],
+        grippers: list[Constant],
+        balls_in_grippers: list[int],
+        balls_in_rooms: list[int],
+        goal: bool = True,
+    ) -> list[Predicate]:
+        assert goal
+        if len(balls) > len(grippers):
+            raise ValueError("Not enough grippers to hold all balls")
+        # NOTE: since we do not define any specific test cases for this task,
+        # all the variables for balls_in_grippres and balls_in_rooms come from
+        # the initial scene
+
+        held_balls = balls[: sum(balls_in_grippers)]
+        free_balls = balls[sum(balls_in_grippers) :]
+
+        used_grippers = [grippers[i] for i, v in enumerate(balls_in_grippers) if v > 0]
+        free_grippers = set(grippers) - set(used_grippers)
+
+        predicates = []
+        for gripper, ball in zip(used_grippers, held_balls):
+            predicates.append(Predicate("carry", ball, gripper))
+
+        for gripper, ball in zip(free_grippers, free_balls):
+            predicates.append(Predicate("carry", ball, gripper))
+
+        return predicates
+
+    def drop_and_pickup(
+        self,
+        rooms: list[Constant],
+        balls: list[Constant],
+        grippers: list[Constant],
+        balls_in_grippers: list[int],
+        balls_in_rooms: list[int],
+        goal: bool = True,
+    ) -> list[Predicate]:
+        assert goal
+        # NOTE: since we do not define any specific test cases for this task,
+        # all the variables for balls_in_grippres and balls_in_rooms come from
+        # the initial scene
+        if len(rooms) < 2:
+            raise ValueError("Drop and pickup requires at least 2 rooms")
+        if not any([b == 0 for b in balls_in_rooms[1:]]):
+            pass
+        if sum(balls_in_rooms) > len(grippers):
+            raise ValueError("Not enough grippers to hold all balls")
+
+        room_idx = balls_in_rooms[1:].index(0) + 1
+        free_room = rooms[room_idx]
+
+        held_balls = balls[: sum(balls_in_grippers)]
+        free_balls = balls[sum(balls_in_grippers) :]
+
+        assert len(free_balls) == sum(balls_in_rooms)
+
+        # drop all balls into free room
+        predicates = []
+        for ball in held_balls:
+            predicates.append(Predicate("at", ball, free_room))
+
+        for gripper, ball in zip(grippers, free_balls):
+            predicates.append(Predicate("carry", ball, gripper))
+
+        return predicates
+
+    def holding(
+        self,
+        rooms: list[Constant],
+        balls: list[Constant],
+        grippers: list[Constant],
+        balls_in_grippers: list[int],
+        balls_in_rooms: list[int],
+        goal: bool = False,
+    ) -> list[Predicate]:
+        if not (len(grippers) and len(balls)):
+            raise ValueError("Holding requires at least one gripper and one ball")
+
+        held_balls = balls[: sum(balls_in_grippers)]
+        free_balls = balls[sum(balls_in_grippers) :]
+
+        predicates = []
+
+        for gripper, ball in zip(grippers, held_balls):
+            predicates.append(Predicate("carry", ball, gripper))
+
+        if not goal:
+            # place free balls according to balls_in_rooms
+            balls_iter = iter(free_balls)
+            for room_idx, num_balls in enumerate(balls_in_rooms):
+                room = rooms[room_idx]
+                for _ in range(num_balls):
+                    predicates.append(Predicate("at", next(balls_iter), room))
+
+        # NOTE: we will ignore the balls in rooms argument for holding if this
+        # is a goal state
+
+        return predicates
+
     def abstract_description(
         self,
         task: str,
         n_rooms: int,
-        balls: list[int],
-        n_grippers: int = 2,
+        n_balls: int,
+        n_grippers: int,
+        balls_in_grippers: list[int],
+        balls_in_rooms: list[int],
         is_init: bool = False,
     ) -> str:
         """Generate an abstract description of the state.
@@ -818,13 +886,12 @@ class GripperDatasetGenerator(DatasetGenerator):
         Returns:
             str: State description.
         """
-        n_balls = sum(balls)
         objects = (
             f"You have {n_rooms} rooms, {n_balls} balls, and {n_grippers} grippers"
         )
 
         def n_room_distributed() -> str:
-            ball_counter = Counter(balls)
+            ball_counter = Counter(balls_in_rooms)
             balls_per_room = ""
             for i, (count, room) in enumerate(ball_counter.items()):
                 room_s = "s" if room > 1 else ""
@@ -866,6 +933,22 @@ class GripperDatasetGenerator(DatasetGenerator):
             case ("focus_min", False):
                 return "Your goal is to bring all the balls into the room which already has the least balls."
 
+            case ("juggle", True):
+                return f"{objects}. {sum(balls_in_grippers)} balls are distributed across the same number of grippers, and the rest are in the first room. The robby is in the first room."
+            case ("juggle", False):
+                return 'Your goal is to "juggle" the balls between the grippers that started with balls, such that the balls are in the same grippers as before, but shifted by one. The remaining balls should remain untouched.'
+
+            case ("pickup", False):
+                return "Your goal is to pick up all the balls with grippers."
+
+            case ("drop_and_pickup", False):
+                return "Your goal is to drop all the balls held by grippers in an empty room that the robby didn't start in, and pick up the balls that started in rooms not held by the robby."
+
+            case ("holding", True):
+                return f"{objects}. {max(sum(balls_in_grippers), 1)} balls are distributed across the same number of grippers, and the rest are in the first room. The robby is in the first room."
+            case ("holding", False):
+                return f"Your goal is to make sure robby is holding {max(sum(balls_in_grippers), 1)} balls."
+
             case _:
                 raise ValueError(f"Invalid task: {task}")
 
@@ -873,7 +956,8 @@ class GripperDatasetGenerator(DatasetGenerator):
         self,
         init: str,
         goal: str,
-        gripper_and_balls_count: list[int],
+        balls_in_grippers: list[int],
+        balls_in_rooms: list[int],
         randomize: bool = True,
     ) -> tuple[Problem, dict[str, dict[str, str]]]:
         """Generate a gripper task.
@@ -890,9 +974,9 @@ class GripperDatasetGenerator(DatasetGenerator):
         Returns:
             tuple[Problem, dict[str, dict[str, str]]]: PDDL problem and descriptions.
         """
-        num_grippers, *balls_count = gripper_and_balls_count
-        num_rooms = len(balls_count)
-        num_balls = sum(balls_count)
+        num_rooms = len(balls_in_rooms)
+        num_balls = sum(balls_in_rooms + balls_in_grippers)
+        num_grippers = len(balls_in_grippers)
 
         rooms = [Constant(f"room{i + 1}") for i in range(num_rooms)]
         balls = [Constant(f"ball{i + 1}") for i in range(num_balls)]
@@ -907,16 +991,18 @@ class GripperDatasetGenerator(DatasetGenerator):
         ]
 
         init_predicates = getattr(self, init)(
-            rooms,
-            balls,
-            grippers,
-            balls_count,
+            rooms=rooms,
+            balls=balls,
+            grippers=grippers,
+            balls_in_grippers=balls_in_grippers,
+            balls_in_rooms=balls_in_rooms,
         )
         goal_predicates = getattr(self, goal)(
-            rooms,
-            balls,
-            grippers,
-            balls_count,
+            rooms=rooms,
+            balls=balls,
+            grippers=grippers,
+            balls_in_grippers=balls_in_grippers,
+            balls_in_rooms=balls_in_rooms,
             goal=True,
         )
 
@@ -938,13 +1024,17 @@ class GripperDatasetGenerator(DatasetGenerator):
                     init,
                     is_init=True,
                     n_rooms=num_rooms,
-                    balls=balls_count,
+                    n_balls=num_balls,
+                    n_grippers=num_grippers,
+                    balls_in_grippers=balls_in_grippers,
+                    balls_in_rooms=balls_in_rooms,
                 ),
                 "explicit": self.explicit_description(
                     init_predicates,
                     is_init=True,
                     n_rooms=num_rooms,
                     n_balls=num_balls,
+                    n_grippers=num_grippers,
                     randomize=randomize,
                 ),
             },
@@ -953,13 +1043,17 @@ class GripperDatasetGenerator(DatasetGenerator):
                     goal,
                     is_init=False,
                     n_rooms=num_rooms,
-                    balls=balls_count,
+                    n_balls=num_balls,
+                    n_grippers=num_grippers,
+                    balls_in_grippers=balls_in_grippers,
+                    balls_in_rooms=balls_in_rooms,
                 ),
                 "explicit": self.explicit_description(
                     goal_predicates,
                     is_init=False,
                     n_rooms=num_rooms,
                     n_balls=num_balls,
+                    n_grippers=num_grippers,
                     randomize=randomize,
                 ),
             },
@@ -968,6 +1062,218 @@ class GripperDatasetGenerator(DatasetGenerator):
         data = {
             "num_objects": len(constants),
             "init_num_propositions": len(init_predicates) + len(typing_predicates),
+            "goal_num_propositions": len(goal_predicates),
+        }
+
+        return problem, descriptions, data
+
+
+class RoverSingleDatasetGenerator(DatasetGenerator):
+
+    def __init__(self):
+
+        super().__init__(
+            "rover",
+            """
+            {%- set tense = "is" if is_init else "should be" -%}
+            {%- if is_init -%}
+                You have {{ n_waypoints }} waypoints.
+                You have {{ n_stores}} stores.
+                You have {{ n_cameras }} cameras.
+                You have {{ n_modes }} modes.
+                You have {{ n_objectives }} objectives.
+            {%- else -%}
+                Your goal is to have the following:
+            {%- endif -%}
+            {%- for predicate in predicates -%}
+                {%- if predicate.name == "at_rover" %}
+                    The rover {{ tense }} at {{ predicate.terms[0].name }}.
+                {%- elif predicate.name == "at_lander" %}
+                    The lander {{ tense }} at {{ predicate.terms[0].name }}.
+                {%- elif predicate.name == "can_traverse" %}
+                    The rover can traverse from {{ predicate.terms[0].name }} to {{ predicate.terms[1].name }}.
+                {%- elif predicate.name == "empty" %}
+                    Store {{ predicate.terms[0].name }} {{ tense }} empty.
+                {%- elif predicate.name == "have_rock_analysis" %}
+                    A rock analysis for waypoint {{ predicate.terms[0].name }} {{ tense }} obtained.
+                {%- elif predicate.name == "have_soil_analysis" %}
+                    A soil analysis for waypoint {{ predicate.terms[0].name }} {{ tense }} obtained.
+                {%- elif predicate.name == "full" %}
+                    Store {{ predicate.terms[0].name }} {{ tense }} full.
+                {%- elif predicate.name == "supports" %}
+                    Camera {{ predicate.terms[0].name }} supports {{ predicate.terms[1].name }} mode.
+                {%- elif predicate.name == "available" %}
+                    The rover {{ tense }} available.
+                {%- elif predicate.name == "visible" %}
+                    The waypoint {{ predicate.terms[0].name }} {{ tense }} visible from waypoint {{ predicate.terms[1].name }}.
+                {%- elif predicate.name == "have_image" %}
+                    An image of objective {{ predicate.terms[0].name }} {{ tense }} taken in mode {{ predicate.terms[1].name }}.
+                {%- elif predicate.name == "communicated_soil_data" %}
+                    The soil data from waypoint {{ predicate.terms[0].name }} {{ tense }} communicated.
+                {%- elif predicate.name == "communicated_rock_data" %}
+                    The rock data from waypoint {{ predicate.terms[0].name }} {{ tense }} communicated.
+                {%- elif predicate.name == "communicated_image_data" %}
+                    An image of objective {{ predicate.terms[0].name }} {{ tense }} communicated in mode {{ predicate.terms[1].name }}.
+                {%- elif predicate.name == "at_rock_sample" %}
+                    A rock sample {{ tense }} available at {{ predicate.terms[0].name }}.
+                {%- elif predicate.name == "at_soil_sample" %}
+                    A soil sample {{ tense }} available at {{ predicate.terms[0].name }}.
+                {%- elif predicate.name == "visible_from" %}
+                    The bjective {{ predicate.terms[0].name }} {{ tense }} visible from {{ predicate.terms[1].name }}.
+                {%- elif predicate.name == "channel_free" %}
+                    Channel {{ tense }} free.
+                {%- endif -%}
+            {%- endfor -%}""",
+        )
+
+    def abstract_description(self, task: str, is_init: bool = False, **kwargs) -> str:
+        """Generate an abstract description of the state.
+
+        Args:
+            task (str): The task to describe.
+            is_init (bool, optional): Whether the description is for the initial
+                state. Defaults to False.
+
+        Raises:
+            ValueError: If the task is invalid/unsupported.
+
+        Returns:
+            str: State description.
+        """
+        match task, is_init:
+            case ("line_navigate", True):
+                return ""
+
+
+class FloorTileDatasetGenerator(DatasetGenerator):
+
+    def __init__(self):
+        # predicates are robot-at, up, right, painted, robot-has, and available-color.
+        super().__init__(
+            "floor-tile",
+            """
+            {%- set tense = "is" if is_init else "should be" -%}
+            {%- set has_robot = "has" if is_init else "should have" -%}
+            {%- if is_init -%}
+                You have {{ n_robots }} robot{{ "s" if n_robots > 1 else "" }}.
+                You have {{ n_tiles }} tile{{ "s" if n_tiles > 1 else "" }}.
+                You have {{ n_colors }} color{{ "s" if n_colors > 1 else "" }}.
+            {%- else -%}
+                Your goal is to have the following:
+            {%- endif -%}
+            {%- for predicate in predicates -%}
+                {%- if predicate.name == "robot-at" %}
+                    The robot {{ tense }} at tile {{ predicate.terms[0].name }}.
+                {%- elif predicate.name == "up" %}
+                    Tile {{ predicate.terms[0].name }} {{ tense }} is above tile {{ predicate.terms[1].name }}.
+                {%- elif predicate.name == "right" %}
+                    Tile {{ predicate.terms[0].name }} {{ tense }} is to the right of tile {{ predicate.terms[1].name }}.
+                {%- elif predicate.name == "painted" %}
+                    Tile {{ predicate.terms[0].name }} {{ tense }} painted with color {{ predicate.terms[1].name }}.
+                {%- elif predicate.name == "robot-has" %}
+                    The robot {{ has_robot }} color {{ predicate.terms[0].name }}.
+                {%- elif predicate.name == "available-color" %}
+                    Color {{ predicate.terms[0].name }} {{ tense }} available.
+                {%- endif -%}
+            {%- endfor -%}""",
+        )
+
+
+    def abstract_description(self, task: str, is_init: bool = False, **kwargs) -> str:
+        pass
+
+
+    def get_task(
+        self,
+        init: str,
+        goal: str,
+        n_robots: int,
+        n_tiles: int,
+        n_colors: int,
+        randomize: bool = True,
+        **kwargs,
+    ) -> tuple[Problem, dict[str, dict[str, str]]]:
+        """Generate a floor tile task.
+
+        Args:
+            init (str): Initial state setting type.
+            goal (str): Goal state setting type.
+            n_robots (int): Number of robots.
+            n_tiles (int): Number of tiles.
+            n_colors (int): Number of colors.
+            randomize (bool, optional): Whether to randomize the order of the
+                tiles. Defaults to True.
+
+        Returns:
+            tuple[Problem, dict[str, dict[str, str]]]: PDDL problem and descriptions.
+        """
+        robots = [Constant(f"robot{i + 1}", type_tag="robot") for i in range(n_robots)]
+        tiles = [Constant(f"tile{i + 1}", type_tag="tile") for i in range(n_tiles)]
+        colors = [Constant(f"color{i + 1}", type_tag="color") for i in range(n_colors)]
+        constants = robots + tiles + colors
+
+        init_predicates = getattr(self, init)(
+            robots=robots,
+            tiles=tiles,
+            colors=colors,
+            **kwargs,
+        )
+        goal_predicates = getattr(self, goal)(
+            robots=robots,
+            tiles=tiles,
+            colors=colors,
+            goal=True,
+            **kwargs,
+        )
+
+        problem = Problem(
+            name=f"{init}_to_{goal}_{n_robots}_{n_tiles}_{n_colors}",
+            domain=self.domain,
+            objects=constants,
+            init=init_predicates,
+            goal=And(*goal_predicates),
+        )
+
+        descriptions = {
+            "init": {
+                "abstract": self.abstract_description(
+                    init,
+                    is_init=True,
+                    n_robots=n_robots,
+                    n_tiles=n_tiles,
+                    n_colors=n_colors,
+                ),
+                "explicit": self.explicit_description(
+                    init_predicates,
+                    is_init=True,
+                    n_robots=n_robots,
+                    n_tiles=n_tiles,
+                    n_colors=n_colors,
+                    randomize=randomize,
+                ),
+            },
+            "goal": {
+                "abstract": self.abstract_description(
+                    goal,
+                    is_init=False,
+                    n_robots=n_robots,
+                    n_tiles=n_tiles,
+                    n_colors=n_colors,
+                ),
+                "explicit": self.explicit_description(
+                    goal_predicates,
+                    is_init=False,
+                    n_robots=n_robots,
+                    n_tiles=n_tiles,
+                    n_colors=n_colors,
+                    randomize=randomize,
+                ),
+            },
+        }
+
+        data = {
+            "num_objects": len(constants),
+            "init_num_propositions": len(init_predicates),
             "goal_num_propositions": len(goal_predicates),
         }
 
@@ -1185,12 +1491,13 @@ def generate(
 
                     task = f"{start}_to_{end}"
                     for source in (start, end):
-                        for args in domain_cfg["tasks"].get(source, []):
+                        kwargs: dict = {}
+                        for kwargs in domain_cfg["tasks"].get(source, kwargs):
                             try:
                                 problem, descriptions, data = generator.get_task(
                                     start,
                                     end,
-                                    args,
+                                    **kwargs,
                                     randomize=config.get("randomize_predicates", False),
                                 )
                             except ValueError:
@@ -1198,10 +1505,16 @@ def generate(
 
                             # ground truth PDDL problem
                             problem_str = pddl_formatter.problem_to_string(problem)
-                            if isinstance(args, int):
-                                arg_str = str(args)
-                            else:
-                                arg_str = "_".join(str(arg) for arg in args)
+                            args = [
+                                arg
+                                for kw, args in kwargs.items()
+                                for arg in (
+                                    (kw, *args)
+                                    if isinstance(args, list)
+                                    else [kw, args]
+                                )
+                            ]
+                            arg_str = "_".join(str(arg) for arg in args)
 
                             problem_name = f"{task}_{arg_str}"
 
@@ -1210,6 +1523,14 @@ def generate(
                                 ("abstract", "explicit"),
                                 ("abstract", "explicit"),
                             ):
+                                # hard-code juggle right now
+                                # TODO: make sure this is correct for all fully_strict or just juggle
+                                if (
+                                    start in fully_strict
+                                    or end in fully_strict
+                                    or start in strictly_both
+                                ) and init_desc != goal_desc:
+                                    continue
                                 problem_desc = [
                                     descriptions["init"][init_desc],
                                     descriptions["goal"][goal_desc],
@@ -1217,7 +1538,7 @@ def generate(
                                 problem_desc_str = "\n".join(problem_desc)
                                 problems.append(
                                     {
-                                        "name": domain_cfg["name"] + problem_name,
+                                        "name": f"{domain_cfg['name']}_{problem_name}",
                                         "domain": domain_cfg["name"],
                                         "init": start,
                                         "goal": end,
