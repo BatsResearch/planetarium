@@ -1,3 +1,5 @@
+from typing import Iterable
+
 import abc
 from collections import Counter, defaultdict
 import itertools
@@ -18,6 +20,54 @@ import tqdm
 
 
 SPLITS = None
+
+
+def int_to_ordinal(number):
+    """Converts an integer to its ordinal string representation (e.g., 1 -> 'first', 2 -> 'second').
+
+    Args:
+      number: The integer to convert.
+
+    Returns:
+      The ordinal string representation of the number, or None if the number is outside the range 1-20.
+    """
+    ordinals = [
+        "first",
+        "second",
+        "third",
+        "fourth",
+        "fifth",
+        "sixth",
+        "seventh",
+        "eighth",
+        "ninth",
+        "tenth",
+        "eleventh",
+        "twelfth",
+        "thirteenth",
+        "fourteenth",
+        "fifteenth",
+        "sixteenth",
+        "seventeenth",
+        "eighteenth",
+        "nineteenth",
+        "twentieth",
+        "twenty-first",
+        "twenty-second",
+        "twenty-third",
+        "twenty-fourth",
+        "twenty-fifth",
+        "twenty-sixth",
+        "twenty-seventh",
+        "twenty-eighth",
+        "twenty-ninth",
+        "thirtieth",
+    ]
+
+    if 1 <= number <= 30:
+        return ordinals[number - 1]
+    else:
+        raise ValueError(f"Number {number} is outside the range 1-20")
 
 
 class DatasetGenerator(abc.ABC):
@@ -846,6 +896,12 @@ class GripperDatasetGenerator(DatasetGenerator):
         for gripper, ball in zip(grippers, held_balls):
             predicates.append(Predicate("carry", ball, gripper))
 
+        # free any additional grippers
+        for gripper in grippers[len(held_balls) :]:
+            predicates.append(Predicate("free", gripper))
+
+        # NOTE: we will ignore the balls in rooms argument for holding if this
+        # is a goal state
         if not goal:
             # place free balls according to balls_in_rooms
             balls_iter = iter(free_balls)
@@ -853,9 +909,6 @@ class GripperDatasetGenerator(DatasetGenerator):
                 room = rooms[room_idx]
                 for _ in range(num_balls):
                     predicates.append(Predicate("at", next(balls_iter), room))
-
-        # NOTE: we will ignore the balls in rooms argument for holding if this
-        # is a goal state
 
         return predicates
 
@@ -996,6 +1049,7 @@ class GripperDatasetGenerator(DatasetGenerator):
             grippers=grippers,
             balls_in_grippers=balls_in_grippers,
             balls_in_rooms=balls_in_rooms,
+            goal=False,
         )
         goal_predicates = getattr(self, goal)(
             rooms=rooms,
@@ -1165,23 +1219,362 @@ class FloorTileDatasetGenerator(DatasetGenerator):
                 {%- if predicate.name == "robot-at" %}
                     The robot {{ tense }} at tile {{ predicate.terms[0].name }}.
                 {%- elif predicate.name == "up" %}
-                    Tile {{ predicate.terms[0].name }} {{ tense }} is above tile {{ predicate.terms[1].name }}.
+                    Tile {{ predicate.terms[1].name }} {{ tense }} is above tile {{ predicate.terms[0].name }}.
                 {%- elif predicate.name == "right" %}
-                    Tile {{ predicate.terms[0].name }} {{ tense }} is to the right of tile {{ predicate.terms[1].name }}.
+                    Tile {{ predicate.terms[1].name }} {{ tense }} is to the right of tile {{ predicate.terms[0].name }}.
                 {%- elif predicate.name == "painted" %}
                     Tile {{ predicate.terms[0].name }} {{ tense }} painted with color {{ predicate.terms[1].name }}.
                 {%- elif predicate.name == "robot-has" %}
-                    The robot {{ has_robot }} color {{ predicate.terms[0].name }}.
+                    The robot {{ predicate.terms[0].name }} {{ has_robot }} color {{ predicate.terms[1].name }}.
                 {%- elif predicate.name == "available-color" %}
                     Color {{ predicate.terms[0].name }} {{ tense }} available.
                 {%- endif -%}
             {%- endfor -%}""",
         )
 
+    def join_elements(self, lst: list) -> str:
+        match lst:
+            case []:
+                return ""
+            case [l1]:
+                return l1
+            case [l1, l2]:
+                return f"{l1} and {l2}"
+            case _:
+                join_str = ", ".join(lst[:-1])
+                last = lst[-1]
 
-    def abstract_description(self, task: str, is_init: bool = False, **kwargs) -> str:
-        pass
+                return f"{join_str}, and {last}"
 
+    def disconnected_rows(
+        self,
+        robots: list[Constant],
+        tiles: list[Constant],
+        colors: list[Constant],
+        goal: bool = False,
+        num_cols: Iterable[int] = (3, 3, 3),
+        **kwargs,
+    ) -> list[Predicate]:
+        """Task where all tiles are disconnected.
+
+        Args:
+            robots (list[Constant]): List of all available robots.
+            tiles (list[Constant]): List of all tiles.
+            colors (list[Constant]): List of all colors.
+            goal (bool, optional): Whether to return goal state. Defaults to False.
+
+        Returns:
+            list[Predicate]: List of predicates describing the state.
+        """
+        assert (
+            len(colors) == len(robots) == len(num_cols)
+        ), f"Invalid number of robots{len(robots)}, colors{len(colors)}, and num_cols{num_cols}"
+        assert sum(num_cols) == len(tiles)
+        assert min(num_cols) > 0
+        assert len(num_cols) > 1
+
+        tiles_iter = iter(tiles)
+        grid = [[next(tiles_iter) for _ in range(n)] for n in num_cols]
+
+        predicates = []
+
+        if not goal:
+            # set up the grid
+            for row in grid:
+                for i in range(len(row) - 1):
+                    predicates.append(Predicate("right", row[i + 1], row[i]))
+
+            # place robots
+            for robot, color, row in zip(robots, colors, grid):
+                predicates.append(Predicate("robot-has", robot, color))
+                predicates.append(Predicate("robot-at", robot, row[0]))
+
+        # paint ends of each row
+
+        for row in grid:
+            predicates.append(Predicate("painted", row[0], colors[0]))
+            if len(row) > 1:
+                predicates.append(Predicate("painted", row[-1], colors[0]))
+
+        return predicates
+
+    def grid(
+        self,
+        robots: list[Constant],
+        tiles: list[Constant],
+        colors: list[Constant],
+        goal: bool = False,
+        grid_size: list[int] = None,
+        robot_data: list[dict[str, int | list[int]]] = None,
+        **kwargs,
+    ):
+        if grid_size is None or robot_data is None:
+            raise ValueError("Grid size and robot data must be provided")
+        if goal:
+            raise ValueError("Grid task is only supported as an initial state")
+
+        num_rows, num_cols = grid_size
+        tiles_iter = iter(tiles)
+
+        grid = [[next(tiles_iter) for _ in range(num_cols)] for _ in range(num_rows)]
+
+        predicates = []
+
+        for i in range(num_rows):
+            for j in range(num_cols):
+                if i > 0:
+                    predicates.append(Predicate("up", grid[i][j], grid[i - 1][j]))
+                if j < num_cols - 1:
+                    predicates.append(Predicate("right", grid[i][j], grid[i][j + 1]))
+
+        for robot, data in zip(robots, robot_data):
+            predicates.append(Predicate("robot-has", robot, colors[data["color"]]))
+            predicates.append(Predicate("robot-at", robot, grid[data["pos"][0]][data["pos"][1]]))
+
+        for color in colors:
+            predicates.append(Predicate("available-color", color))
+
+        return predicates
+
+    def rings(
+        self,
+        robots: list[Constant],
+        tiles: list[Constant],
+        colors: list[Constant],
+        goal: bool = False,
+        grid_size: list[int] = None,
+        robot_data: list[dict[str, int | list[int]]] = None,
+        init_task: str = None,
+        **kwargs,
+    ) -> list[Predicate]:
+        """Task where all tiles are arranged in rings.
+
+        Args:
+            robots (list[Constant]): List of all available robots.
+            tiles (list[Constant]): List of all tiles.
+            colors (list[Constant]): List of all colors.
+            goal (bool, optional): Whether to return goal state. Defaults to False.
+            num_rings (int, optional): Number of rings. Defaults to 3.
+
+        Returns:
+            list[Predicate]: List of predicates describing the state.
+        """
+        if grid_size is None or robot_data is None:
+            raise ValueError("Grid size and robot data must be provided")
+        if goal and init_task not in ("rings",):
+            raise ValueError("Rings goal task must have rings init task")
+        assert grid_size[0] == grid_size[1]
+
+        grid_size = grid_size[0]
+        num_rings = round(grid_size / 2 + 0.5)
+        assert len(tiles) == grid_size**2
+        assert len(colors) == num_rings > 1
+        assert len(robots) == len(robot_data)
+
+        predicates = [Predicate("available-color", color) for color in colors]
+
+        tiles_iter = iter(tiles)
+        grid = [[next(tiles_iter) for _ in range(grid_size)] for _ in range(grid_size)]
+
+        if goal:
+            # paint all the tiles in rings
+            for i in range(grid_size):
+                for j in range(grid_size):
+                    ring = min(i, j, grid_size - i - 1, grid_size - j - 1)
+                    predicates.append(Predicate("painted", grid[i][j], colors[ring]))
+        else:
+            # robot positions, top-left corner and center
+            for robot, data in zip(robots, robot_data):
+                predicates.append(Predicate("robot-has", robot, colors[data["color"]]))
+                predicates.append(
+                    Predicate("robot-at", robot, grid[data["pos"][0]][data["pos"][1]])
+                )
+
+            # grid position predicates
+            for i in range(grid_size):
+                for j in range(grid_size):
+                    if i > 0:
+                        # second element is above the first
+                        predicates.append(Predicate("up", grid[i][j], grid[i - 1][j]))
+                    if j < grid_size - 1:
+                        # second element is to the right of the first
+                        predicates.append(
+                            Predicate("right", grid[i][j], grid[i][j + 1])
+                        )
+
+        return predicates
+
+    def checkerboard(
+        self,
+        robots: list[Constant],
+        tiles: list[Constant],
+        colors: list[Constant],
+        goal: bool = False,
+        grid_size: list[int] = None,
+        **kwargs,
+    ) -> list[Predicate]:
+        if grid_size is None:
+            raise ValueError("Grid size must be provided")
+        if not goal:
+            raise ValueError("Checkerboard task is only supported as a goal state")
+        if len(colors) != 2:
+            raise ValueError("Checkerboard task requires exactly 2 colors")
+
+        grid_size_x, grid_size_y = grid_size
+        assert len(tiles) == grid_size_x * grid_size_y
+
+        tiles_iter = iter(tiles)
+        grid = [[next(tiles_iter) for _ in range(grid_size_x)] for _ in range(grid_size_y)]
+
+        predicates = []
+
+        for i in range(grid_size_y):
+            for j in range(grid_size_x):
+                if (i + j) % 2 == 0:
+                    color = colors[0]
+                else:
+                    color = colors[1]
+                predicates.append(Predicate("painted", grid[i][j], color))
+
+        return predicates
+
+    def all_different(
+        self,
+        robots: list[Constant],
+        tiles: list[Constant],
+        colors: list[Constant],
+        goal: bool = False,
+        **kwargs,
+    ) -> list[Predicate]:
+        if not goal:
+            raise ValueError("All different task is only supported as a goal state")
+        if len(colors) != len(tiles):
+            raise ValueError("All different task requires exactly one color per tile")
+
+        predicates = []
+        for tile, color in zip(tiles, colors):
+            predicates.append(Predicate("painted", tile, color))
+
+        return predicates
+
+    def paint_all(
+        self,
+        robots: list[Constant],
+        tiles: list[Constant],
+        colors: list[Constant],
+        goal: bool = False,
+        **kwargs,
+    ) -> list[Predicate]:
+        if not goal:
+            raise ValueError("Paint all task is only supported as a goal state")
+        if len(colors) != 1:
+            raise ValueError("Paint all task requires exactly one color")
+
+        predicates = []
+        for tile in tiles:
+            predicates.append(Predicate("painted", tile, colors[0]))
+
+        return predicates
+
+    def abstract_description(
+        self,
+        task: str,
+        n_robots: int,
+        n_tiles: int,
+        n_colors: int,
+        is_init: bool = False,
+        **kwargs,
+    ) -> str:
+        """Generate an abstract description of the state.
+
+        Args:
+            task (str): The task to describe.
+            n_robots (int): Number of robots.
+            n_tiles (int): Number of tiles.
+            n_colors (int): Number of colors.
+            is_init (bool, optional): Whether the description is for the initial
+                state. Defaults to False.
+
+        Returns:
+            str: State description.
+        """
+
+        def get_robot_ring_string(
+            grid_size_x: int,
+            grid_size_y: int,
+            robot_data: list[dict, str, int | list[int]],
+        ) -> str:
+            robot_ring_string = ""
+            for i, data in enumerate(robot_data):
+                # TODO: check strings
+                pos_x, pos_y = data["pos"]
+                if pos_x == pos_y and pos_x <= grid_size_x / 2:
+                    pos_str = f"the top-left corner of the {int_to_ordinal(pos_x + 1)} ring from the outside"
+                elif pos_x == pos_y and pos_x > grid_size_x / 2:
+                    pos_str = f"the bottom-right corner of the {int_to_ordinal(pos_x + 1)} ring from the outside"
+                elif pos_x == grid_size_x - pos_y - 1:
+                    pos_str = f"the top-right corner of the {int_to_ordinal(pos_x + 1)} ring from the outside"
+                elif pos_y == grid_size_y - pos_x - 1:
+                    pos_str = f"the bottom-left corner of the {int_to_ordinal(pos_x + 1)} ring from the outside"
+                else:
+                    pos_str = f"{int_to_ordinal(pos_x + 1)} row and {int_to_ordinal(pos_y + 1)} column"
+                robot_ring_string += f"The {int_to_ordinal(i + 1)} robot is at the {pos_str}, and has the {int_to_ordinal(data['color'] + 1)} color. "
+
+            return robot_ring_string
+
+        def get_robot_grid_string(
+            grid_size_x: int,
+            grid_size_y: int,
+            robot_data: list[dict, str, int | list[int]],
+        ) -> str:
+            robot_grid_string = ""
+            for i, data in enumerate(robot_data):
+                pos_x, pos_y = data["pos"]
+                robot_grid_string += f"The {int_to_ordinal(i + 1)} robot is at the {int_to_ordinal(pos_y + 1)} row and {int_to_ordinal(pos_x + 1)} column, and has the {int_to_ordinal(data['color'] + 1)} color. "
+
+            return robot_grid_string
+
+        match task, is_init:
+            case ("disconnected_rows", True):
+                num_cols = kwargs.get("num_cols")
+                if all(n == num_cols[0] for n in num_cols):
+                    num_cols_str = f"{num_cols[0]}"
+                else:
+                    num_cols_str = self.join_elements([str(n) for n in num_cols])
+                return f"You have {n_tiles} unpainted tiles arranged in disconnected rows. There are {len(num_cols)} rows, each with {num_cols_str} tiles. At the start (tile on the left end) of each row is a robot, each of which has a different color. No colors are available."
+            case ("disconnected_rows", False):
+                return "Your goal is to paint the ends of each row."
+
+            case ("grid", True):
+                num_rows, num_cols = kwargs.get("grid_size")
+                # TODO: check x vs y for col vs row
+                return f"You have {n_colors} colors and {n_tiles} unpainted tiles arranged in a grid with {num_rows} rows and {num_cols} columns. All colors are available."
+
+            case ("rings", True):
+                grid_size_x, grid_size_y = kwargs.get("grid_size")
+                assert grid_size_x == grid_size_y
+                num_rings = round(grid_size_x / 2 + 0.5)
+                robot_ring_string = get_robot_ring_string(
+                    grid_size_x,
+                    grid_size_y,
+                    kwargs.get("robot_data"),
+                )
+                return f"You have {n_colors} colors and {n_tiles} unpainted tiles arranged in a {grid_size_x}x{grid_size_y} grid, in {num_rings} rings. {robot_ring_string}All colors are available."
+
+            case ("rings", False):
+                return "Your goal is to paint all the tiles such that each ring has a different color."
+
+            case ("paint_all", False):
+                return "Your goal is to paint all the tiles with the same color."
+
+            case ("checkerboard", False):
+                return "Your goal is to paint the tiles in a checkerboard pattern."
+
+            case ("all_different", False):
+                return "Your goal is to paint each tile with a different color."
+
+            case _:
+                raise ValueError(f"Invalid task: {task}")
 
     def get_task(
         self,
@@ -1216,6 +1609,8 @@ class FloorTileDatasetGenerator(DatasetGenerator):
             robots=robots,
             tiles=tiles,
             colors=colors,
+            init_task=init,
+            goal_task=goal,
             **kwargs,
         )
         goal_predicates = getattr(self, goal)(
@@ -1223,6 +1618,8 @@ class FloorTileDatasetGenerator(DatasetGenerator):
             tiles=tiles,
             colors=colors,
             goal=True,
+            init_task=init,
+            goal_task=goal,
             **kwargs,
         )
 
@@ -1242,6 +1639,7 @@ class FloorTileDatasetGenerator(DatasetGenerator):
                     n_robots=n_robots,
                     n_tiles=n_tiles,
                     n_colors=n_colors,
+                    **kwargs,
                 ),
                 "explicit": self.explicit_description(
                     init_predicates,
@@ -1259,6 +1657,7 @@ class FloorTileDatasetGenerator(DatasetGenerator):
                     n_robots=n_robots,
                     n_tiles=n_tiles,
                     n_colors=n_colors,
+                    **kwargs,
                 ),
                 "explicit": self.explicit_description(
                     goal_predicates,
@@ -1463,6 +1862,10 @@ def generate(
                 generator = BlocksworldDatasetGenerator()
             case "gripper":
                 generator = GripperDatasetGenerator()
+            case "rover-single":
+                generator = RoverSingleDatasetGenerator()
+            case "floor-tile":
+                generator = FloorTileDatasetGenerator()
             case _:
                 raise ValueError(f"Invalid domain: {domain_cfg['name']}")
         insert_domain(
