@@ -1329,7 +1329,9 @@ class FloorTileDatasetGenerator(DatasetGenerator):
 
         for robot, data in zip(robots, robot_data):
             predicates.append(Predicate("robot-has", robot, colors[data["color"]]))
-            predicates.append(Predicate("robot-at", robot, grid[data["pos"][0]][data["pos"][1]]))
+            predicates.append(
+                Predicate("robot-at", robot, grid[data["pos"][0]][data["pos"][1]])
+            )
 
         for color in colors:
             predicates.append(Predicate("available-color", color))
@@ -1424,7 +1426,9 @@ class FloorTileDatasetGenerator(DatasetGenerator):
         assert len(tiles) == grid_size_x * grid_size_y
 
         tiles_iter = iter(tiles)
-        grid = [[next(tiles_iter) for _ in range(grid_size_x)] for _ in range(grid_size_y)]
+        grid = [
+            [next(tiles_iter) for _ in range(grid_size_x)] for _ in range(grid_size_y)
+        ]
 
         predicates = []
 
@@ -1454,6 +1458,46 @@ class FloorTileDatasetGenerator(DatasetGenerator):
         predicates = []
         for tile, color in zip(tiles, colors):
             predicates.append(Predicate("painted", tile, color))
+
+        return predicates
+
+    def paint_x(
+        self,
+        robots: list[Constant],
+        tiles: list[Constant],
+        colors: list[Constant],
+        goal: bool = False,
+        grid_size: list[int] = None,
+        **kwargs,
+    ) -> list[Predicate]:
+        if not grid_size or grid_size[0] != grid_size[1]:
+            raise ValueError("Paint x task requires a square grid size")
+        if not goal:
+            raise ValueError("Paint x task is only supported as a goal state")
+        if not (0 < len(colors) <= 2):
+            raise ValueError("Paint x task requires exactly one color")
+
+        tiles_iter = iter(tiles)
+
+        grid = [
+            [next(tiles_iter) for _ in range(grid_size[0])] for _ in range(grid_size[1])
+        ]
+
+        predicates = []
+        painted = set()
+        for i in range(grid_size[0]):
+            predicates.append(Predicate("painted", grid[i][i], colors[0]))
+            painted.add((i, i))
+            predicates.append(
+                Predicate("painted", grid[i][grid_size[0] - i - 1], colors[0])
+            )
+            painted.add((i, grid_size[0] - i - 1))
+
+        if len(colors) == 2:
+            for i in range(grid_size[0]):
+                for j in range(grid_size[0]):
+                    if (i, j) not in painted:
+                        predicates.append(Predicate("painted", grid[i][j], colors[1]))
 
         return predicates
 
@@ -1566,6 +1610,12 @@ class FloorTileDatasetGenerator(DatasetGenerator):
 
             case ("paint_all", False):
                 return "Your goal is to paint all the tiles with the same color."
+
+            case ("paint_x", False):
+                if n_colors == 1:
+                    return "Your goal is to paint an 'X' shape on the tiles with a single color."
+                elif n_colors == 2:
+                    return "Your goal is to paint an 'X' shape on the tiles, and every other tile should be painted with a different color."
 
             case ("checkerboard", False):
                 return "Your goal is to paint the tiles in a checkerboard pattern."
@@ -1982,7 +2032,7 @@ def insert_split(
 
     Args:
         conn (sqlite3.Connection): SQLite database connection.
-        name (str): Name of the split.
+        name (str): Name of the split.d
         split (dict[int | str, list[int]]): Split data.
     """
     cursor = conn.cursor()
@@ -2007,6 +2057,19 @@ def split(
     random.seed(config.get("random_seed", 42))
     conn = sqlite3.connect(database_path)
     cursor = conn.cursor()
+    # drop splits table if exists
+    cursor.execute("DROP TABLE IF EXISTS splits")
+    cursor.execute(
+        """
+        CREATE TABLE splits (
+            problem_id INTEGER NOT NULL,
+            split_type TEXT NOT NULL,
+            split TEXT NOT NULL,
+            PRIMARY KEY (problem_id, split),
+            FOREIGN KEY (problem_id) REFERENCES problems (id)
+        )
+        """
+    )
 
     # split by domain
     cursor.execute(
@@ -2095,11 +2158,44 @@ def split(
                 f"{i}": problems[i::num_random_splits] for i in range(num_random_splits)
             }
 
+            # split by held-out problems
+            heldout_splits = {"train": [], "test": []}
+            heldout_config = config.get("heldout", {})
+
+            heldout_test_ids = set()
+            for d, queries in heldout_config.items():
+                if d != domain:
+                    continue
+                for query in queries:
+                    init_query, goal_query = query['init'], query['goal']
+                    args = [domain]
+                    query_str = ""
+                    if init_query:
+                        query_str += f" AND init = ?"
+                        args.append(init_query)
+                    if goal_query:
+                        query_str += f" AND goal = ?"
+                        args.append(goal_query)
+                    cursor.execute(
+                        f"""
+                        SELECT id
+                        FROM problems
+                        WHERE domain = ?{query_str}
+                        """,
+                        args,
+                    )
+
+                    heldout_test_ids.update([row[0] for row in cursor.fetchall()])
+
+            heldout_splits["test"] = list(heldout_test_ids)
+            heldout_splits["train"] = list(set(problems) - heldout_test_ids)
+
             splits = {
                 "abstraction": abstraction_splits,
                 "size": size_splits,
                 "placeholder": strict_splits,
                 "random": random_splits,
+                "heldout": heldout_splits,
             }
             domain_splits[domain] = splits
             pbar.update()
