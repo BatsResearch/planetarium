@@ -1,7 +1,7 @@
 ;; Modified from: https://github.com/AI-Planning/pddl-generators/blob/main/floortile/domain.pddl
 
 (define (domain floor-tile)
-  (:requirements :typing :action-costs)
+  (:requirements :typing)
   (:types
     robot tile color - object
   )

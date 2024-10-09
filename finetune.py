@@ -136,7 +136,7 @@ def preprocess(
     inputs = [
         strip(
             tokenizer.apply_chat_template(
-                    llmp.PlanningProblem(nl, d, p).apply_template(
+                llmp.PlanningProblem(nl, d, p).apply_template(
                     domain_prompt,
                     problem_prompt,
                 ),
@@ -204,6 +204,34 @@ def load_model(config: dict) -> tuple[PreTrainedTokenizer, PreTrainedModel]:
     return tokenizer, model
 
 
+def extract_instruct_tokens(tokenizer: PreTrainedTokenizer) -> tuple[str, str]:
+    """Extract the instruction tokens from the tokenizer.
+
+    Args:
+        tokenizer (PreTrainedTokenizer): The tokenizer to use.
+
+    Returns:
+        tuple[str, str]: The templates.
+    """
+    placeholder = tokenizer.unk_token
+
+    chat_str = tokenizer.apply_chat_template(
+        [
+            {"role": "user", "content": placeholder},
+            {"role": "assistant", "content": placeholder},
+        ],
+        tokenize=False,
+    )
+
+    if not tokenizer.chat_template:
+        templates = chat_str.split(f" {placeholder} ")
+    else:
+        templates = chat_str.split(placeholder)
+        templates = [t.replace("<s> ", "").strip() for t in templates]
+
+    return templates[:2]
+
+
 def main(config_path: str):
     """Train a model on a dataset using a given configuration.
 
@@ -217,17 +245,16 @@ def main(config_path: str):
     # Load dataset
     dataset = load_dataset(config["dataset"])
 
-    train_config = config["train"]
+    train_config: dict = config["train"]
 
     # Load model
     tokenizer, model = load_model(train_config)
 
     # Create data collator
+    instr_template, resp_template = extract_instruct_tokens(tokenizer)
     data_collator = DataCollatorForCompletionOnlyLM(
-        tokenizer.encode(
-            train_config["model"]["response_template"],
-            add_special_tokens=False,
-        ),
+        response_template=resp_template,
+        instruction_template=instr_template,
         tokenizer=tokenizer,
     )
 

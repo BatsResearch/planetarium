@@ -4,19 +4,11 @@ import os
 from pddl.parser.problem import LenientProblemParser
 from pddl.formatter import problem_to_string
 
-from planetarium import builder, oracle, metric, downward
-from . import domains
+from planetarium import builder, oracle, metric, downward, DOMAINS
 
 
 VALIDATE = os.getenv("VALIDATE", "Validate")
 DOWNWARD = os.getenv("DOWNWARD", "downward")
-DOMAINS = dict()
-
-# load domains
-for domain in resources.files(domains).iterdir():
-    with domain.open() as f:
-        DOMAINS[os.path.basename(domain).split(".")[0]] = f.read()
-
 
 def evaluate(
     source_pddl_str: str,
@@ -55,7 +47,7 @@ def evaluate(
     try:
         target_graph = builder.build(target_pddl_str)
         parseable = True
-    except Exception:
+    except Exception as e:
         return parseable, solveable, equivalent
 
     clean_pddl_str = problem_to_string(LenientProblemParser()(target_pddl_str))
