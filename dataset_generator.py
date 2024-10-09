@@ -1288,13 +1288,12 @@ class FloorTileDatasetGenerator(DatasetGenerator):
             for robot, color, row in zip(robots, colors, grid):
                 predicates.append(Predicate("robot-has", robot, color))
                 predicates.append(Predicate("robot-at", robot, row[0]))
-
-        # paint ends of each row
-
-        for row in grid:
-            predicates.append(Predicate("painted", row[0], colors[0]))
-            if len(row) > 1:
-                predicates.append(Predicate("painted", row[-1], colors[0]))
+        else:
+            # paint ends of each row
+            for i, row in enumerate(grid):
+                predicates.append(Predicate("painted", row[0], colors[i]))
+                if len(row) > 1:
+                    predicates.append(Predicate("painted", row[-1], colors[i]))
 
         return predicates
 
@@ -1323,9 +1322,9 @@ class FloorTileDatasetGenerator(DatasetGenerator):
         for i in range(num_rows):
             for j in range(num_cols):
                 if i > 0:
-                    predicates.append(Predicate("up", grid[i][j], grid[i - 1][j]))
+                    predicates.append(Predicate("up", grid[i - 1][j], grid[i][j]))
                 if j < num_cols - 1:
-                    predicates.append(Predicate("right", grid[i][j], grid[i][j + 1]))
+                    predicates.append(Predicate("right", grid[i][j + 1], grid[i][j]))
 
         for robot, data in zip(robots, robot_data):
             predicates.append(Predicate("robot-has", robot, colors[data["color"]]))
@@ -1396,12 +1395,12 @@ class FloorTileDatasetGenerator(DatasetGenerator):
             for i in range(grid_size):
                 for j in range(grid_size):
                     if i > 0:
-                        # second element is above the first
-                        predicates.append(Predicate("up", grid[i][j], grid[i - 1][j]))
+                        # first element is above the second
+                        predicates.append(Predicate("up", grid[i - 1][j], grid[i][j]))
                     if j < grid_size - 1:
-                        # second element is to the right of the first
+                        # first element is to the right of the second
                         predicates.append(
-                            Predicate("right", grid[i][j], grid[i][j + 1])
+                            Predicate("right", grid[i][j + 1], grid[i][j])
                         )
 
         return predicates
@@ -1511,8 +1510,9 @@ class FloorTileDatasetGenerator(DatasetGenerator):
     ) -> list[Predicate]:
         if not goal:
             raise ValueError("Paint all task is only supported as a goal state")
-        if len(colors) != 1:
-            raise ValueError("Paint all task requires exactly one color")
+        if not (1 < len(colors) <= 3):
+            raise ValueError("Paint all task requires at least one color")
+        # NOTE: first color needs to either be held already or available
 
         predicates = []
         for tile in tiles:
@@ -1548,7 +1548,7 @@ class FloorTileDatasetGenerator(DatasetGenerator):
             grid_size_y: int,
             robot_data: list[dict, str, int | list[int]],
         ) -> str:
-            robot_ring_string = ""
+            robot_ring_string = " "
             for i, data in enumerate(robot_data):
                 # TODO: check strings
                 pos_x, pos_y = data["pos"]
@@ -1571,10 +1571,20 @@ class FloorTileDatasetGenerator(DatasetGenerator):
             grid_size_y: int,
             robot_data: list[dict, str, int | list[int]],
         ) -> str:
-            robot_grid_string = ""
+            robot_grid_string = " "
             for i, data in enumerate(robot_data):
                 pos_x, pos_y = data["pos"]
-                robot_grid_string += f"The {int_to_ordinal(i + 1)} robot is at the {int_to_ordinal(pos_y + 1)} row and {int_to_ordinal(pos_x + 1)} column, and has the {int_to_ordinal(data['color'] + 1)} color. "
+                match (pos_x, pos_y):
+                    case (0, 0):
+                        robot_grid_string += f"The {int_to_ordinal(i + 1)} robot is at the top-left corner, and has the {int_to_ordinal(data['color'] + 1)} color. "
+                    case (0, y) if y == grid_size_y - 1:
+                        robot_grid_string += f"The {int_to_ordinal(i + 1)} robot is at the top-right corner, and has the {int_to_ordinal(data['color'] + 1)} color. "
+                    case (x, 0) if x == grid_size_x - 1:
+                        robot_grid_string += f"The {int_to_ordinal(i + 1)} robot is at the bottom-left corner, and has the {int_to_ordinal(data['color'] + 1)} color. "
+                    case (x, y) if x == grid_size_x - 1 and y == grid_size_y - 1:
+                        robot_grid_string += f"The {int_to_ordinal(i + 1)} robot is at the bottom-right corner, and has the {int_to_ordinal(data['color'] + 1)} color. "
+                    case _:
+                        robot_grid_string += f"The {int_to_ordinal(i + 1)} robot is at the {int_to_ordinal(pos_x + 1)} row and {int_to_ordinal(pos_y + 1)} column, and has the {int_to_ordinal(data['color'] + 1)} color. "
 
             return robot_grid_string
 
@@ -1591,8 +1601,12 @@ class FloorTileDatasetGenerator(DatasetGenerator):
 
             case ("grid", True):
                 num_rows, num_cols = kwargs.get("grid_size")
-                # TODO: check x vs y for col vs row
-                return f"You have {n_colors} colors and {n_tiles} unpainted tiles arranged in a grid with {num_rows} rows and {num_cols} columns. All colors are available."
+                grid_string = get_robot_grid_string(
+                    num_rows,
+                    num_cols,
+                    kwargs.get("robot_data"),
+                )
+                return f"You have {n_robots} robots, {n_colors} colors, and {n_tiles} unpainted tiles arranged in a grid with {num_rows} rows and {num_cols} columns.{grid_string}All colors are available."
 
             case ("rings", True):
                 grid_size_x, grid_size_y = kwargs.get("grid_size")
@@ -1603,7 +1617,7 @@ class FloorTileDatasetGenerator(DatasetGenerator):
                     grid_size_y,
                     kwargs.get("robot_data"),
                 )
-                return f"You have {n_colors} colors and {n_tiles} unpainted tiles arranged in a {grid_size_x}x{grid_size_y} grid, in {num_rings} rings. {robot_ring_string}All colors are available."
+                return f"You have {n_colors} colors and {n_tiles} unpainted tiles arranged in a {grid_size_x}x{grid_size_y} grid, in {num_rings} rings.{robot_ring_string}All colors are available."
 
             case ("rings", False):
                 return "Your goal is to paint all the tiles such that each ring has a different color."
@@ -1613,9 +1627,9 @@ class FloorTileDatasetGenerator(DatasetGenerator):
 
             case ("paint_x", False):
                 if n_colors == 1:
-                    return "Your goal is to paint an 'X' shape on the tiles with a single color."
+                    return "Your goal is to paint an 'X' shape across the grid onto the tiles with a single color."
                 elif n_colors == 2:
-                    return "Your goal is to paint an 'X' shape on the tiles, and every other tile should be painted with a different color."
+                    return "Your goal is to paint an 'X' shape across the grid onto, and every other tile should be painted with a different color."
 
             case ("checkerboard", False):
                 return "Your goal is to paint the tiles in a checkerboard pattern."
