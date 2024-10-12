@@ -1660,6 +1660,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
                 return "The goal is for the rover to transmit data from all objectives, each captured with a different camera mode, and to relay data from all soil and rock samples to the lander. Additionally, the rover must be positioned at the same waypoint as the lander."
 
     def grid_navigate(
+        self,
         waypoints,
         objectives,
         stores,
@@ -1696,6 +1697,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         rover_waypoint = waypoints[rover_position[0] * grid_size_y + rover_position[1]]
         predicates.append(Predicate("at_rover", rover_waypoint))
 
+        lander_position = kwargs.get("lander_position")
         lander_waypoint = waypoints[lander_position[0] * grid_size_y + lander_position[1]]
         predicates.append(Predicate("at_lander", lander_waypoint))
 
@@ -1705,6 +1707,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def line_navigate(
+        self,
         waypoints,
         objectives,
         stores,
@@ -1744,6 +1747,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def circle_navigate(
+        self,
         waypoints,
         objectives,
         stores,
@@ -1783,6 +1787,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def star_navigate(
+        self,
         waypoints,
         objectives,
         stores,
@@ -1817,6 +1822,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def partitioned_navigate(
+        self,
         waypoints,
         objectives,
         stores,
@@ -1844,11 +1850,15 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
             predicates.append(Predicate("visible", waypoint, waypoint))
 
         rover_position = kwargs.get("rover_position")
-        rover_waypoint = waypoints[rover_position]
+        side, pos = rover_position
+        waypoint_idx = pos if side == 0 else num_l + pos
+        rover_waypoint = waypoints[waypoint_idx]
         predicates.append(Predicate("at_rover", rover_waypoint))
 
         lander_position = kwargs.get("lander_position")
-        lander_waypoint = waypoints[lander_position]
+        side, pos = lander_position
+        waypoint_idx = pos if side == 0 else num_l + pos
+        lander_waypoint = waypoints[waypoint_idx]
         predicates.append(Predicate("at_lander", lander_waypoint))
 
         predicates.append(Predicate("channel_free"))
@@ -1857,6 +1867,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates 
 
     def _set_capacities(
+        self,
         stores,
         cameras,
         modes,
@@ -1873,6 +1884,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def grid_analysis(
+        self,
         waypoints,
         objectives,
         stores,
@@ -1895,7 +1907,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
 
         grid_size_x, grid_size_y = kwargs.get("grid_size")
 
-        objective_positions = kwargs.get("objective_positions")
+        objective_positions = kwargs.get("objective_visible_positions")
         for obj, (x, y) in zip(objectives, objective_positions):
             waypoint_idx = x * grid_size_y + y
             waypoint = waypoints[waypoint_idx]
@@ -1917,7 +1929,8 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
 
         return predicates
 
-    def _linear_set(        
+    def _linear_set(
+        self,
         waypoints,
         objectives,
         stores,
@@ -1929,7 +1942,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
     ):
         predicates = []
 
-        objective_positions = kwargs.get("objective_positions")
+        objective_positions = kwargs.get("objective_visible_positions")
         for obj, waypoint_idx in zip(objectives, objective_positions):
             waypoint = waypoints[waypoint_idx]
             predicates.append(Predicate("visible_from", obj, waypoint))
@@ -1947,6 +1960,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates   
 
     def line_analysis(
+        self,
         waypoints,
         objectives,
         stores,
@@ -1985,6 +1999,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def circle_analysis(
+        self,
         waypoints,
         objectives,
         stores,
@@ -2023,6 +2038,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def star_analysis(
+        self,
         waypoints,
         objectives,
         stores,
@@ -2061,6 +2077,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def partitioned_analysis(
+        self,
         waypoints,
         objectives,
         stores,
@@ -2081,7 +2098,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
             **kwargs
         )
 
-        objective_positions = kwargs.get("objective_positions")
+        objective_positions = kwargs.get("objective_visible_positions")
         for obj, (side, pos) in zip(objectives, objective_positions):
             waypoint_idx = pos if side == 0 else num_l + pos
             waypoint = waypoints[waypoint_idx]
@@ -2103,7 +2120,25 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
 
         return predicates
 
+    def _get_position(self, position, n_waypoints, initial_state, **kwargs):
+        if "grid" in initial_state:
+            x, y = position
+            waypoint_idx = x * kwargs.get("grid_size")[1] + y
+        elif "line" in initial_state:
+            waypoint_idx = position
+        elif "circle" in initial_state:
+            waypoint_idx = position % n_waypoints
+        elif "star" in initial_state:
+            waypoint_idx = position if position == 0 else position - 1
+        elif "partitioned" in initial_state:
+            side, pos = position
+            num_l = kwargs.get("partition_sizes")[0]
+            waypoint_idx = pos if side == 0 else num_l + pos
+
+        return waypoint_idx
+
     def rover_in_lander(
+        self,
         waypoints,
         objectives,
         stores,
@@ -2116,30 +2151,17 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         predicates = []
 
         lander_position = kwargs.get("lander_position")
-        lander_waypoint = waypoints[lander_position]
+        waypoint_idx = self._get_position(
+            lander_position, len(waypoints), init_task, **kwargs
+        )
+        lander_waypoint = waypoints[waypoint_idx]
         predicates.append(Predicate("at_lander", lander_waypoint))
         predicates.append(Predicate("at_rover", lander_waypoint))
 
         return predicates
 
-    def _get_position(position, n_waypoints, initial_state, **kwargs):
-        if initial_state == "grid":
-            x, y = position
-            waypoint_idx = x * kwargs.get("grid_size")[1] + y
-        elif initial_state == "line":
-            waypoint_idx = position
-        elif initial_state == "circle":
-            waypoint_idx = position % n_waypoints
-        elif initial_state == "star":
-            waypoint_idx = position if position == 0 else position + 1
-        elif initial_state == "partitioned":
-            side, pos = position
-            num_l = kwargs.get("partition_sizes")[0]
-            waypoint_idx = pos if side == 0 else num_l + pos
-
-        return waypoint_idx
-
     def transmit_rocks(
+        self,
         waypoints,
         objectives,
         stores,
@@ -2150,6 +2172,10 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         **kwargs
     ):
         predicates = []
+
+        if not kwargs.get("rock_positions"):
+            return predicates
+
         rock_positions = kwargs.get("rock_positions")
 
         for position in rock_positions:
@@ -2162,6 +2188,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def transmit_soil(
+        self,
         waypoints,
         objectives,
         stores,
@@ -2172,9 +2199,13 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         **kwargs
     ):
         predicates = []
-        rock_positions = kwargs.get("soil_positions")
 
-        for position in rock_positions:
+        if not kwargs.get("rock_positions"):
+            return predicates
+
+        soil_positions = kwargs.get("soil_positions")
+
+        for position in soil_positions:
             waypoint_idx = self._get_position(
                 position, len(waypoints), init_task, **kwargs
             )
@@ -2184,6 +2215,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def transmit_objectives(
+        self, 
         waypoints,
         objectives,
         stores,
@@ -2195,6 +2227,9 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
     ):
         predicates = []
 
+        if not objectives:
+            return predicates
+
         for obj in objectives:
             for mode in modes:
                 predicates.append(Predicate("communicated_image_data", obj, mode))
@@ -2202,6 +2237,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
 
     def transmit_all(
+        self,
         waypoints,
         objectives,
         stores,
@@ -2233,6 +2269,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         return predicates
     
     def transmit_all_and_in_lander(
+        self,
         waypoints,
         objectives,
         stores,
@@ -2274,7 +2311,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         objectives = [Constant(f"objective{i + 1}", type_tag="objective") for i in range(n_objectives)]
         stores = [Constant(f"store{i + 1}", type_tag="store") for i in range(n_stores)]
         cameras = [Constant(f"cameras{i + 1}", type_tag="camera") for i in range(n_stores)]
-        modes = [Constant(f"mode{i + 1}", type_tag="mode") for i in range]
+        modes = [Constant(f"mode{i + 1}", type_tag="mode") for i in range(n_modes)]
         constants = waypoints + objectives + stores + cameras + modes
 
         init_predicates = getattr(self, init)(
@@ -2313,12 +2350,24 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
                     init,
                     is_init=True,
                     n_waypoints=n_waypoints,
+                    n_objectives=n_objectives,
+                    n_rocks=n_rocks,
+                    n_soil=n_soil,
+                    n_cameras=n_cameras,
+                    n_modes=n_modes,
+                    n_stores=n_stores,
                     **kwargs,
                 ),
                 "explicit": self.explicit_description(
                     init_predicates,
                     is_init=True,
                     n_waypoints=n_waypoints,
+                    n_objectives=n_objectives,
+                    n_rocks=n_rocks,
+                    n_soil=n_soil,
+                    n_cameras=n_cameras,
+                    n_modes=n_modes,
+                    n_stores=n_stores,
                     randomize=randomize,
                 ),
             },
@@ -2327,12 +2376,24 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
                     goal,
                     is_init=False,
                     n_waypoints=n_waypoints,
+                    n_objectives=n_objectives,
+                    n_rocks=n_rocks,
+                    n_soil=n_soil,
+                    n_cameras=n_cameras,
+                    n_modes=n_modes,
+                    n_stores=n_stores,
                     **kwargs,
                 ),
                 "explicit": self.explicit_description(
                     goal_predicates,
                     is_init=False,
                     n_waypoints=n_waypoints,
+                    n_objectives=n_objectives,
+                    n_rocks=n_rocks,
+                    n_soil=n_soil,
+                    n_cameras=n_cameras,
+                    n_modes=n_modes,
+                    n_stores=n_stores,
                     randomize=randomize,
                 ),
             },
@@ -2755,7 +2816,7 @@ class FloorTileDatasetGenerator(DatasetGenerator):
                     num_cols,
                     kwargs.get("robot_data"),
                 )
-                return f"You have {n_robots} robots, {n_colors} colors, and {n_tiles}unpainted tiles arranged in a grid with {num_rows} rows and {num_cols} columns.{grid_string}All colors are available."
+                return f"You have {n_robots} robots, {n_colors} colors, and {n_tiles} unpainted tiles arranged in a grid with {num_rows} rows and {num_cols} columns.{grid_string}All colors are available."
 
             case ("rings", True):
                 grid_size_x, grid_size_y = kwargs.get("grid_size")
