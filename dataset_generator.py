@@ -2431,6 +2431,11 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
             **kwargs,
         )
 
+        if not goal_predicates:
+            # RAISE IF COMBINATION OF INIT STATE AND GOAL 
+            # END GENERATING NO GOALS
+            raise ValueError()
+
         problem = Problem(
             name=f"{init}_to_{goal}_{n_waypoints}_{n_objectives}_{n_rocks}_{n_soil}_{n_cameras}_{n_modes}",
             domain=self.domain,
