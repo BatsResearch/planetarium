@@ -1988,7 +1988,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         for obj, (x, y) in zip(objectives, objective_positions):
             waypoint_idx = x * grid_size_y + y
             waypoint = waypoints[waypoint_idx]
-            predicates.append(Predicate("visible", waypoint, obj))
+            predicates.append(Predicate("visible_from", waypoint, obj))
 
         rock_positions = kwargs.get("rock_positions")
         for x, y in rock_positions:
