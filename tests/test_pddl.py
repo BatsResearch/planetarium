@@ -418,6 +418,13 @@ class TestBuild:
         """
         builder.build(single_predicate_goal).decompose()
 
+
+    def test_to_pddl_str(self, single_predicate_goal):
+        """
+        Test the size of nodes in the scene graphs built from a PDDL problem.
+        """
+        builder.build(single_predicate_goal).to_pddl_str()
+
     def test_not_predicate_goal(self, not_predicate_goal):
         """
         Test the size of nodes in the scene graphs built from a PDDL problem.

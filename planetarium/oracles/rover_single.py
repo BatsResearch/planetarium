@@ -1,5 +1,7 @@
+from functools import partial
 from typing import Any
 
+from collections import Counter, defaultdict
 import copy
 from itertools import permutations
 
@@ -13,8 +15,6 @@ ReducedNode.register(
     {
         "ROVER": "rover",
         "LANDER": "lander",
-        "EMPTY": "empty",
-        "FULL": "full",
         "AVAILABLE": "available",
         "AT_ROCK_SAMPLE": "at_rock_sample",
         "AT_SOIL_SAMPLE": "at_soil_sample",
@@ -197,29 +197,25 @@ class RoverSingleOracle(oracle.Oracle):
             )
 
     @staticmethod
-    def _rover_get_unchangeable_predicates(
-        scene: ReducedSceneGraph,
-    ) -> list[dict[str, Any]]:
-        """Get the unchangeable predicates in a rover scene graph.
+    def _apply_unchangeable_predicates(
+        init: ReducedSceneGraph,
+        goal: ReducedSceneGraph,
+    ):
+        """Apply unchangeable predicates from the init to the goal of a rover
+            problem.
 
         Args:
             scene (ReducedGraph): The reduced SceneGraph of a scene.
-
-        Returns:
-            list[dict[str, Any]]: The unchangeable predicates in the scene graph.
         """
-        predicates = []
 
-        for u, v, edge in scene.edges:
+        for u, v, edge in init.edges:
+            copy_edge = copy.deepcopy(edge)
+            copy_edge.scene = graph.Scene.GOAL
             match edge.predicate:
                 case pred if pred in ("available", "channel_free"):
                     # all actions that affect these predicates always set them back
-                    predicates.append(
-                        {
-                            "typing": pred,
-                            "parameters": [],
-                        }
-                    )
+                    if not goal.has_edge(u, v, copy_edge):
+                        goal.add_edge(u, v, copy_edge)
                 # unary unchangeable predicates
                 case pred if pred in (
                     "communicated_soil_data",
@@ -227,34 +223,172 @@ class RoverSingleOracle(oracle.Oracle):
                     "at_lander",  # landers don't move
                     "have_soil_analysis",
                     "have_rock_analysis",
+                    "at_rock_sample",
+                    "at_soil_sample",
                 ):
-                    predicates.append(
-                        {
-                            "typing": pred,
-                            "parameters": [v.node],
-                        }
-                    )
+                    if not goal.has_edge(u, v, copy_edge):
+                        goal.add_edge(u, v, copy_edge)
                 # binary unchangeable predicates
                 case pred if pred in (
                     "supports",
                     "communicated_image_data",
                     "visible_from",
-                    "store_of",
-                    "on_board",
                     "have_image",
                     "visible",
                     "can_traverse",
                 ):
-                    if pred == "visible_from":
-                        v, u = u, v
-                    predicates.append(
-                        {
-                            "typing": pred,
-                            "parameters": [u.node, v.node],
-                        }
+
+                    if not goal.has_edge(u, v, copy_edge):
+                        goal.add_edge(u, v, copy_edge)
+
+    def _apply_have_predicates(
+        init: ReducedSceneGraph,
+        goal: ReducedSceneGraph,
+    ):
+        """Apply have_* predicates when needed.
+
+        If a goal is to communicate a certain sample, then the rover must have
+        that sample as well, so the have_* prediate must also exist.
+
+        Args:
+            init (ReducedSceneGraph): The reduced SceneGraph of the init.
+            goal (ReducedSceneGraph): The reduced SceneGraph of the goal.
+        """
+
+        # if soil needs to be communicated but has not already,
+        # then the rover must have the soil sample
+        for comm, have, pred in (
+            (
+                ReducedNode.COMMUNICATED_SOIL_DATA,
+                ReducedNode.HAVE_SOIL_ANALYSIS,
+                "have_soil_analysis",
+            ),
+            (
+                ReducedNode.COMMUNICATED_ROCK_DATA,
+                ReducedNode.HAVE_ROCK_ANALYSIS,
+                "have_rock_analysis",
+            ),
+        ):
+            for waypoint in goal.successors(comm):
+                # if the rover hasn't already communicated the sample
+                # the rover has to have the sample
+                if not init.has_edge(comm, waypoint) and not goal.has_edge(
+                    have, waypoint
+                ):
+                    goal.add_edge(
+                        have,
+                        waypoint,
+                        graph.PlanGraphEdge(predicate=pred, scene=graph.Scene.GOAL),
                     )
 
-        return predicates
+        for u, v, edge in list(goal.edges):
+            if edge.predicate == "communicated_image_data":
+                copy_edge = copy.deepcopy(edge)
+                copy_edge.scene = graph.Scene.INIT
+
+                have_edge = graph.PlanGraphEdge(
+                    predicate="have_image",
+                    scene=graph.Scene.GOAL,
+                )
+                if not init.has_edge(u, v, copy_edge) and not goal.has_edge(u, v, have_edge):
+                    goal.add_edge(u, v, have_edge)
+
+
+    @staticmethod
+    def _get_sample_waypoints(
+        init: ReducedSceneGraph,
+        goal: ReducedSceneGraph,
+    ) -> tuple[
+        dict[str, set[graph.PlanGraphNode]],
+        dict[str, set[graph.PlanGraphNode]],
+        dict[str, set[graph.PlanGraphNode]],
+    ]:
+        """Get the sample waypoints as defined in init.
+
+        Args:
+            init (ReducedSceneGraph): The reduced SceneGraph of the init.
+            goal (ReducedSceneGraph): The reduced SceneGraph of the goal.
+
+        Returns:
+            tuple[dict[str, set[graph.PlanGraphNode]], dict[str, set[graph.PlanGraphNode]]]:
+                A tuple containing the sample waypoints in the init:
+                    - "available": on ground & can be picked up.
+                    - waypoint samples that started on the rover.
+                    - waypoints that are required to be visited.
+        """
+        # AVAILABLE SAMPLES
+        available_samples = defaultdict(set)
+
+        rock_sample_node = ReducedNode.AT_ROCK_SAMPLE
+        soil_sample_node = ReducedNode.AT_SOIL_SAMPLE
+        goal_rock_samples = set(n for n, _ in goal.out_edges(rock_sample_node))
+        for waypoint in init.successors(ReducedNode.AT_ROCK_SAMPLE):
+            if waypoint not in goal_rock_samples:
+                available_samples["rock"].add(waypoint)
+
+        goal_soil_samples = set(n for n, _ in goal.out_edges(soil_sample_node))
+        for waypoint in init.successors(ReducedNode.AT_SOIL_SAMPLE):
+            if waypoint not in goal_soil_samples:
+                available_samples["soil"].add(waypoint)
+
+        # HELD SAMPLES
+        held_samples = defaultdict(set)
+
+        have_rock_node = ReducedNode.HAVE_ROCK_ANALYSIS
+        have_soil_node = ReducedNode.HAVE_SOIL_ANALYSIS
+        for waypoint, _ in init.out_edges(have_rock_node):
+            held_samples["rock"].add(waypoint)
+
+        for waypoint, _ in init.out_edges(have_soil_node):
+            held_samples["soil"].add(waypoint)
+
+        required_have = set()
+        for _type, have in (
+            # ("image", ReducedNode.HAVE_IMAGE),
+            ("soil", ReducedNode.HAVE_SOIL_ANALYSIS),
+            ("rock", ReducedNode.HAVE_ROCK_ANALYSIS),
+        ):
+            goal_have = (n for n in goal.successors(have))
+            init_have = set(n for n in init.successors(have))
+
+            for waypoint in goal_have:
+                if waypoint not in init_have:
+                    required_have.add((waypoint, _type))
+
+        required_comm = defaultdict(set)
+        for _type, comm in (
+            # ("image", ReducedNode.COMMUNICATED_IMAGE_DATA),
+            ("soil", ReducedNode.COMMUNICATED_SOIL_DATA),
+            ("rock", ReducedNode.COMMUNICATED_ROCK_DATA),
+        ):
+            goal_comm = (n for n in goal.successors(comm))
+            init_comm = set(n for n in init.successors(comm))
+
+            for waypoint in goal_comm:
+                if waypoint not in init_comm:
+                    required_comm[_type].add((waypoint, _type))
+
+
+        for u, v, edge in goal.edges:
+            if edge == graph.PlanGraphEdge(predicate="have_image"):
+                copy_edge = copy.deepcopy(edge)
+                copy_edge.scene = graph.Scene.INIT
+
+                if not init.has_edge(u, v, copy_edge):
+                    required_have.add((u, v))
+            elif edge == graph.PlanGraphEdge(predicate="communicated_image_data"):
+                copy_edge = copy.deepcopy(edge)
+                copy_edge.scene = graph.Scene.INIT
+
+                if not init.has_edge(u, v, copy_edge):
+                    required_comm["image"].add((u, v))
+
+        required_stops = {
+            "have": required_have,
+            "comm": required_comm,
+        }
+
+        return available_samples, held_samples, required_stops
 
     @staticmethod
     def _rover_subgraph(scene: ReducedSceneGraph) -> ReducedSceneGraph:
@@ -277,9 +411,7 @@ class RoverSingleOracle(oracle.Oracle):
             if node.label == graph.Label.CONSTANT and not isinstance(
                 node.node, ReducedNode
             ):
-                if node.typing.issubset(
-                    {"waypoint", "objective", "store", "camera", "mode"}
-                ):
+                if node.typing.issubset({"waypoint", "objective", "camera", "mode"}):
                     subgraph.add_node(copy.deepcopy(node))
 
         for u, v, edge in scene.edges:
@@ -310,7 +442,7 @@ class RoverSingleOracle(oracle.Oracle):
     def _all_endpoints(
         scene: ReducedSceneGraph,
         path_map: rx.AllPairsMultiplePathMapping,
-        sample_waypoints: list[tuple[graph.PlanGraphNode, bool]],
+        sample_waypoints: set[tuple[graph.PlanGraphNode, bool]],
         final_position: graph.PlanGraphNode | None = None,
         needs_lander: bool = False,
     ) -> set[int]:
@@ -359,11 +491,24 @@ class RoverSingleOracle(oracle.Oracle):
 
         if needs_lander:
             # lander must be visited
-            sample_waypoints.append((ReducedNode.LANDER, False))
-        waypoint_order = filter(check_lander, permutations([*sample_waypoints]))
-        to_idx = ([scene._node_lookup[w][0] for w, _ in wo] for wo in waypoint_order)
+            sample_waypoints.add(
+                (
+                    graph.PlanGraphNode(
+                        ReducedNode.LANDER,
+                        name=ReducedNode.LANDER.value,
+                        label=graph.Label.PREDICATE,
+                        typing=ReducedNode.LANDER.value,
+                    ),
+                    False,
+                )
+            )
+        waypoint_order = list(filter(check_lander, permutations(sample_waypoints)))
+        to_idx = (
+            [scene._node_lookup[w.node][0] for w, _ in wo] for wo in waypoint_order
+        )
+
         if final_position:
-            final_pos = scene._node_lookup[final_position][0]
+            final_pos = scene._node_lookup[final_position.node][0]
             to_idx = ([*idx, final_pos] for idx in to_idx)
 
         valid_paths = set([tuple(s) for vo in to_idx for s in validate_order(vo)])
@@ -398,66 +543,26 @@ class RoverSingleOracle(oracle.Oracle):
         """
         inflated_init, inflated_goal = copy.deepcopy(problem).decompose()
         init: ReducedSceneGraph = RoverSingleOracle.reduce(inflated_init)
+        goal: ReducedSceneGraph = RoverSingleOracle.reduce(inflated_goal)
 
         # bring all unchangeable predicates to the goal
-        unchangeable_predicates = RoverSingleOracle._rover_get_unchangeable_predicates(
-            init
-        )
-        for pred in unchangeable_predicates:
-            if pred not in inflated_goal.predicates:
-                inflated_goal._add_predicate(pred, scene=graph.Scene.GOAL)
-
-        # communicated predicates need have_* predicates
-        for pred in inflated_goal.predicates:
-            params = pred["parameters"]
-            match pred["typing"].split("_"):
-                case ["communicated", sample, "data"]:
-                    have_pred = {
-                        "typing": f"have_{sample}{'_analysis' if sample != 'image' else ''}",
-                        "parameters": params,
-                        "scene": graph.Scene.GOAL,
-                    }
-                    if have_pred not in inflated_goal.predicates:
-                        inflated_goal._add_predicate(
-                            have_pred,
-                            scene=graph.Scene.GOAL,
-                        )
+        RoverSingleOracle._apply_unchangeable_predicates(init, goal)
+        RoverSingleOracle._apply_have_predicates(init, goal)
 
         # all waypoints that must be visited
-        sample_waypoints = []
-        needs_lander = False
-        for pred in inflated_goal.predicates:
-            match pred["typing"].split("_"):
-                case ["have", sample, *_] if sample in ("rock", "soil", "image"):
-                    waypoint = pred["parameters"][0]
-                    # check if the rover needs to communicate the data
-                    com_pred = {
-                        "typing": f"communicated_{sample}_data",
-                        "parameters": pred["parameters"],
-                        "scene": graph.Scene.GOAL,
-                    }
-                    # needs to communicate if it wasn't already communicated
-                    communicate = (
-                        com_pred in inflated_goal.predicates
-                        and {**com_pred, "scene": graph.Scene.INIT}
-                        not in inflated_init.predicates
-                    )
-                    needs_lander = needs_lander or communicate
-                    init_pred = {
-                        "typing": pred["typing"],
-                        "parameters": pred["parameters"],
-                        "scene": graph.Scene.INIT,
-                    }
-                    if init_pred not in inflated_init.predicates:
-                        sample_waypoints.append((waypoint, communicate))
-                case ["communicated", *_]:
-                    com_pred = {
-                        "typing": pred["typing"],
-                        "parameters": pred["parameters"],
-                        "scene": graph.Scene.INIT,
-                    }
-                    if com_pred not in inflated_init.predicates:
-                        needs_lander = True
+        sampleable_waypoints, held_waypoints, required_stops = (
+            RoverSingleOracle._get_sample_waypoints(init, goal)
+        )
+        needs_lander = len(required_stops["comm"]) > 0
+
+        combined_required_stops = dict()
+        for waypoint, _ in required_stops["have"]:
+            combined_required_stops[waypoint] = False
+        for waypoint, _ in required_stops["comm"].items():
+            if waypoint in combined_required_stops:
+                combined_required_stops[waypoint] = True
+
+        sample_waypoints = set((w, c) for w, c in combined_required_stops.items())
 
         rover_map = RoverSingleOracle._rover_subgraph(init)
         path_map = rx.all_pairs_all_simple_paths(rover_map.graph)
@@ -465,15 +570,21 @@ class RoverSingleOracle(oracle.Oracle):
         # find paths:
         # rover needs to sample -> communicate -> goal position
 
-        def final_destination():
-            for pred in inflated_goal.predicates:
-                if pred["typing"] == "at_rover":
-                    return pred["parameters"][0]
+        initial_pos = list(
+            v for v, e in init.out_edges(ReducedNode.ROVER) if e.predicate == "at_rover"
+        )[0]
+        final_pos = (
+            list(
+                v
+                for v, e in goal.out_edges(ReducedNode.ROVER)
+                if e.predicate == "at_rover"
+            )
+            or None
+        )
 
-        def _init_waypoint() -> list[int]:
-            return init.successors(ReducedNode.ROVER)
+        if final_pos:
+            final_pos = final_pos[0]
 
-        final_pos = final_destination()
         if sample_waypoints:
             endpoints = RoverSingleOracle._all_endpoints(
                 rover_map,
@@ -484,7 +595,7 @@ class RoverSingleOracle(oracle.Oracle):
             )
         elif final_pos is None:
             # TODO: endpoints is the original rover position
-            endpoints = {rover_map.graph.nodes().index(i) for i in _init_waypoint()}
+            endpoints = set([rover_map.graph.nodes().index(initial_pos)])
             for state in list(endpoints):
                 endpoints.update(
                     [
@@ -501,17 +612,15 @@ class RoverSingleOracle(oracle.Oracle):
             # check how many locations he can be at
             if len(endpoints) == 1:
                 (endpoint,) = endpoints
-                inflated_goal._add_predicate(
-                    {
-                        "typing": "at_rover",
-                        "parameters": [endpoint.node],
-                        "scene": graph.Scene.GOAL,
-                    }
+                goal.add_edge(
+                    ReducedNode.ROVER,
+                    endpoint,
+                    graph.PlanGraphEdge(predicate="at_rover", scene=graph.Scene.GOAL),
                 )
 
         if return_reduced:
-            return ReducedProblemGraph.join(
-                init, RoverSingleOracle.reduce(inflated_goal)
-            )
+            return ReducedProblemGraph.join(init, goal)
         else:
-            return graph.ProblemGraph.join(inflated_init, inflated_goal)
+            return graph.ProblemGraph.join(
+                inflated_init, RoverSingleOracle.inflate(goal)
+            )

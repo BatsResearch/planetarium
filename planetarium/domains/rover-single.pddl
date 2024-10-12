@@ -1,17 +1,15 @@
 (define (domain rover-single)
   (:requirements :strips :typing)
   (:types
-    waypoint store camera mode objective
+    waypoint camera mode objective
   )
 
   (:predicates
     (at_rover ?y - waypoint)
     (at_lander ?y - waypoint)
     (can_traverse ?x - waypoint ?y - waypoint)
-    (empty ?s - store)
     (have_rock_analysis ?w - waypoint)
     (have_soil_analysis ?w - waypoint)
-    (full ?s - store)
     (supports ?c - camera ?m - mode)
     (available)
     (visible ?w - waypoint ?p - waypoint)
@@ -33,23 +31,15 @@
   )
 
   (:action sample_soil
-    :parameters (?s - store ?p - waypoint)
-    :precondition (and (at_rover ?p) (at_soil_sample ?p) (empty ?s))
-    :effect (and (not (empty ?s)) (full ?s) (have_soil_analysis ?p)
-      (not (at_soil_sample ?p)))
+    :parameters (?p - waypoint)
+    :precondition (and (at_rover ?p) (at_soil_sample ?p))
+    :effect (and (have_soil_analysis ?p))
   )
 
   (:action sample_rock
-    :parameters (?s - store ?p - waypoint)
-    :precondition (and (at_rover ?p) (at_rock_sample ?p) (empty ?s))
-    :effect (and (not (empty ?s)) (full ?s) (have_rock_analysis ?p)
-      (not (at_rock_sample ?p)))
-  )
-
-  (:action drop
-    :parameters (?y - store)
-    :precondition (full ?y)
-    :effect (and (not (full ?y)) (empty ?y))
+    :parameters (?p - waypoint)
+    :precondition (and (at_rover ?p) (at_rock_sample ?p))
+    :effect (and (have_rock_analysis ?p))
   )
 
   (:action take_image

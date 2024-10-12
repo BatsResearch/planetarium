@@ -974,590 +974,12 @@ def gripper_missing_typing():
 
 
 @pytest.fixture
-def rover_line_fully_specified():
-    return """
-    (define (problem rover)
-        (:domain rover)
-        (:objects
-            rover1 rover2 rover3 - rover
-            site1 site2 site3 site4 site5 site6 - waypoint
-        )
-        (:init
-            (can_traverse rover1 site1 site2)
-            (can_traverse rover1 site2 site3)
-            (can_traverse rover1 site3 site4)
-            (can_traverse rover1 site4 site5)
-            (can_traverse rover1 site5 site6)
-            (can_traverse rover2 site1 site2)
-            (can_traverse rover2 site2 site3)
-            (can_traverse rover2 site3 site4)
-            (can_traverse rover2 site4 site5)
-            (can_traverse rover2 site5 site6)
-            (can_traverse rover3 site1 site2)
-            (can_traverse rover3 site2 site3)
-            (can_traverse rover3 site3 site4)
-            (can_traverse rover3 site4 site5)
-            (can_traverse rover3 site5 site6)
-            (visible site1 site2)
-            (visible site2 site3)
-            (visible site3 site4)
-            (visible site4 site5)
-            (visible site5 site6)
-            (at rover1 site1)
-            (at rover2 site1)
-            (at rover3 site5)
-            (available rover1)
-            (available rover2)
-            (available rover3)
-        )
-        (:goal
-            (and
-                (can_traverse rover1 site1 site2)
-                (can_traverse rover1 site2 site3)
-                (can_traverse rover1 site3 site4)
-                (can_traverse rover1 site4 site5)
-                (can_traverse rover1 site5 site6)
-                (can_traverse rover2 site1 site2)
-                (can_traverse rover2 site2 site3)
-                (can_traverse rover2 site3 site4)
-                (can_traverse rover2 site4 site5)
-                (can_traverse rover2 site5 site6)
-                (can_traverse rover3 site1 site2)
-                (can_traverse rover3 site2 site3)
-                (can_traverse rover3 site3 site4)
-                (can_traverse rover3 site4 site5)
-                (can_traverse rover3 site5 site6)
-                (visible site1 site2)
-                (visible site2 site3)
-                (visible site3 site4)
-                (visible site4 site5)
-                (visible site5 site6)
-                (at rover1 site6)
-                (at rover2 site6)
-                (at rover3 site6)
-                (available rover1)
-                (available rover2)
-                (available rover3)
-            )
-        )
-    )"""
-
-
-@pytest.fixture
-def rover_line():
-    return """
-    (define (problem rover)
-        (:domain rover)
-        (:objects
-            rover1 rover2 rover3 - rover
-            site1 site2 site3 site4 site5 site6 - waypoint
-        )
-        (:init
-            (can_traverse rover1 site1 site2)
-            (can_traverse rover1 site2 site3)
-            (can_traverse rover1 site3 site4)
-            (can_traverse rover1 site4 site5)
-            (can_traverse rover1 site5 site6)
-            (can_traverse rover2 site1 site2)
-            (can_traverse rover2 site2 site3)
-            (can_traverse rover2 site3 site4)
-            (can_traverse rover2 site4 site5)
-            (can_traverse rover2 site5 site6)
-            (can_traverse rover3 site1 site2)
-            (can_traverse rover3 site2 site3)
-            (can_traverse rover3 site3 site4)
-            (can_traverse rover3 site4 site5)
-            (can_traverse rover3 site5 site6)
-            (visible site1 site2)
-            (visible site2 site3)
-            (visible site3 site4)
-            (visible site4 site5)
-            (visible site5 site6)
-            (at rover1 site1)
-            (at rover2 site1)
-            (at rover3 site5)
-            (available rover1)
-            (available rover2)
-            (available rover3)
-        )
-        (:goal
-            (and
-                (at rover1 site6)
-                (at rover2 site6)
-                (at rover3 site6)
-            )
-        )
-    )"""
-
-
-@pytest.fixture
-def rover_line_fully_specified_1():
-    return """
-    (define (problem rover)
-        (:domain rover)
-        (:objects
-            rover1 rover2 rover3 - rover
-            site1 site2 site3 site4 site5 site6 - waypoint
-            lander1 lander2 - lander
-            store1 store2 - store
-            rgb - mode
-            camera1 camera2 camera3 - camera
-            objective1 objective2 objective3 - objective
-        )
-        (:init
-            (can_traverse rover1 site1 site2)
-            (can_traverse rover1 site2 site3)
-            (can_traverse rover1 site3 site4)
-            (can_traverse rover1 site4 site5)
-            (can_traverse rover1 site5 site6)
-            (can_traverse rover2 site1 site2)
-            (can_traverse rover2 site2 site3)
-            (can_traverse rover2 site3 site4)
-            (can_traverse rover2 site4 site5)
-            (can_traverse rover2 site5 site6)
-            (can_traverse rover3 site1 site2)
-            (can_traverse rover3 site2 site3)
-            (can_traverse rover3 site3 site4)
-            (can_traverse rover3 site4 site5)
-            (can_traverse rover3 site5 site6)
-            (visible site1 site2)
-            (visible site2 site3)
-            (visible site3 site4)
-            (visible site4 site5)
-            (visible site5 site6)
-            (at rover1 site1)
-            (at rover2 site1)
-            (at rover3 site5)
-            (available rover1)
-            (available rover2)
-            (available rover3)
-            (at_lander lander1 site1)
-            (at_lander lander2 site6)
-            (empty store1)
-            (full store2)
-            (store_of store1 rover1)
-            (store_of store2 rover2)
-            (equipped_for_imaging rover3)
-            (on_board camera1 rover3)
-            (on_board camera2 rover3)
-            (on_board camera3 rover3)
-            (supports camera1 rgb)
-            (supports camera2 rgb)
-            (supports camera3 rgb)
-            (equipped_for_soil_analysis rover1)
-            (equipped_for_soil_analysis rover2)
-            (equipped_for_soil_analysis rover3)
-            (equipped_for_rock_analysis rover1)
-            (equipped_for_rock_analysis rover2)
-            (equipped_for_rock_analysis rover3)
-            (visible_from objective1 site5)
-            (calibration_target camera1 objective1)
-            (channel_free lander2)
-        )
-        (:goal
-            (and
-                (can_traverse rover1 site1 site2)
-                (can_traverse rover1 site2 site3)
-                (can_traverse rover1 site3 site4)
-                (can_traverse rover1 site4 site5)
-                (can_traverse rover1 site5 site6)
-                (can_traverse rover2 site1 site2)
-                (can_traverse rover2 site2 site3)
-                (can_traverse rover2 site3 site4)
-                (can_traverse rover2 site4 site5)
-                (can_traverse rover2 site5 site6)
-                (can_traverse rover3 site1 site2)
-                (can_traverse rover3 site2 site3)
-                (can_traverse rover3 site3 site4)
-                (can_traverse rover3 site4 site5)
-                (can_traverse rover3 site5 site6)
-                (visible site1 site2)
-                (visible site2 site3)
-                (visible site3 site4)
-                (visible site5 site6)
-                (available rover1)
-                (available rover2)
-                (available rover3)
-                (at rover1 site6)
-                (at rover2 site6)
-                (at rover3 site6)
-                (at_lander lander1 site1)
-                (at_lander lander2 site6)
-                (empty store1)
-                (full store2)
-                (store_of store1 rover1)
-                (store_of store2 rover2)
-                (equipped_for_imaging rover3)
-                (on_board camera1 rover3)
-                (on_board camera2 rover3)
-                (on_board camera3 rover3)
-                (supports camera1 rgb)
-                (supports camera2 rgb)
-                (supports camera3 rgb)
-                (equipped_for_soil_analysis rover1)
-                (equipped_for_soil_analysis rover2)
-                (equipped_for_soil_analysis rover3)
-                (equipped_for_rock_analysis rover1)
-                (equipped_for_rock_analysis rover2)
-                (equipped_for_rock_analysis rover3)
-                (visible_from objective1 site5)
-                (calibration_target camera1 objective1)
-                (channel_free lander2)
-                (have_image rover3 objective1 rgb)
-                (communicated_image_data objective1 rgb)
-            )
-        )
-    )"""
-
-
-@pytest.fixture
-def rover_line_fully_specified_2():
-    return """
-    (define (problem rover)
-        (:domain rover)
-        (:objects
-            rover1 rover2 rover3 - rover
-            site1 site2 site3 site4 site5 site6 - waypoint
-            lander1 lander2 - lander
-            store1 store2 - store
-            grayscale rgb - mode
-            camera1 camera2 camera3 - camera
-            objective1 objective2 objective3 - objective
-        )
-        (:init
-            (can_traverse rover1 site1 site2)
-            (can_traverse rover1 site2 site3)
-            (can_traverse rover1 site3 site4)
-            (can_traverse rover1 site4 site5)
-            (can_traverse rover1 site5 site6)
-            (can_traverse rover2 site1 site2)
-            (can_traverse rover2 site2 site3)
-            (can_traverse rover2 site3 site4)
-            (can_traverse rover2 site4 site5)
-            (can_traverse rover2 site5 site6)
-            (can_traverse rover3 site1 site2)
-            (can_traverse rover3 site2 site3)
-            (can_traverse rover3 site3 site4)
-            (can_traverse rover3 site4 site5)
-            (can_traverse rover3 site5 site6)
-            (visible site1 site2)
-            (visible site2 site3)
-            (visible site3 site4)
-            (visible site4 site5)
-            (visible site5 site6)
-            (at rover1 site1)
-            (at rover2 site1)
-            (at rover3 site5)
-            (available rover1)
-            (available rover2)
-            (available rover3)
-            (at_lander lander1 site1)
-            (at_lander lander2 site6)
-            (empty store1)
-            (full store2)
-            (store_of store1 rover1)
-            (store_of store2 rover2)
-            (equipped_for_imaging rover3)
-            (on_board camera1 rover3)
-            (on_board camera2 rover3)
-            (on_board camera3 rover3)
-            (supports camera1 grayscale)
-            (supports camera2 grayscale)
-            (supports camera3 grayscale)
-            (equipped_for_soil_analysis rover1)
-            (equipped_for_soil_analysis rover2)
-            (equipped_for_soil_analysis rover3)
-            (equipped_for_rock_analysis rover1)
-            (equipped_for_rock_analysis rover2)
-            (equipped_for_rock_analysis rover3)
-            (visible_from objective1 site5)
-            (calibration_target camera1 objective1)
-            (channel_free lander2)
-        )
-        (:goal
-            (and
-                (can_traverse rover1 site1 site2)
-                (can_traverse rover1 site2 site3)
-                (can_traverse rover1 site3 site4)
-                (can_traverse rover1 site4 site5)
-                (can_traverse rover1 site5 site6)
-                (can_traverse rover2 site1 site2)
-                (can_traverse rover2 site2 site3)
-                (can_traverse rover2 site3 site4)
-                (can_traverse rover2 site4 site5)
-                (can_traverse rover2 site5 site6)
-                (can_traverse rover3 site1 site2)
-                (can_traverse rover3 site2 site3)
-                (can_traverse rover3 site3 site4)
-                (can_traverse rover3 site4 site5)
-                (can_traverse rover3 site5 site6)
-                (visible site1 site2)
-                (visible site2 site3)
-                (visible site3 site4)
-                (visible site5 site6)
-                (available rover1)
-                (available rover2)
-                (available rover3)
-                (at rover1 site6)
-                (at rover2 site6)
-                (at rover3 site6)
-                (at_lander lander1 site1)
-                (at_lander lander2 site6)
-                (empty store1)
-                (full store2)
-                (store_of store1 rover1)
-                (store_of store2 rover2)
-                (equipped_for_imaging rover3)
-                (on_board camera1 rover3)
-                (on_board camera2 rover3)
-                (on_board camera3 rover3)
-                (supports camera1 grayscale)
-                (supports camera2 grayscale)
-                (supports camera3 grayscale)
-                (equipped_for_soil_analysis rover1)
-                (equipped_for_soil_analysis rover2)
-                (equipped_for_soil_analysis rover3)
-                (equipped_for_rock_analysis rover1)
-                (equipped_for_rock_analysis rover2)
-                (equipped_for_rock_analysis rover3)
-                (visible_from objective1 site5)
-                (communicated_image_data objective1 rgb)
-                (have_image rover3 objective1 rgb)
-                (calibration_target camera1 objective1)
-                (channel_free lander2)
-            )
-        )
-    )"""
-
-
-@pytest.fixture
-def rover_line_underspecified_1():
-    return """
-    (define (problem rover)
-        (:domain rover)
-        (:objects
-            rover1 rover2 rover3 - rover
-            site1 site2 site3 site4 site5 site6 - waypoint
-            lander1 lander2 - lander
-            store1 store2 - store
-            rgb - mode
-            camera1 camera2 camera3 - camera
-            objective1 objective2 objective3 - objective
-        )
-        (:init
-            (can_traverse rover1 site1 site2)
-            (can_traverse rover1 site2 site3)
-            (can_traverse rover1 site3 site4)
-            (can_traverse rover1 site4 site5)
-            (can_traverse rover1 site5 site6)
-            (can_traverse rover2 site1 site2)
-            (can_traverse rover2 site2 site3)
-            (can_traverse rover2 site3 site4)
-            (can_traverse rover2 site4 site5)
-            (can_traverse rover2 site5 site6)
-            (can_traverse rover3 site1 site2)
-            (can_traverse rover3 site2 site3)
-            (can_traverse rover3 site3 site4)
-            (can_traverse rover3 site4 site5)
-            (can_traverse rover3 site5 site6)
-            (visible site1 site2)
-            (visible site2 site3)
-            (visible site3 site4)
-            (visible site4 site5)
-            (visible site5 site6)
-            (at rover1 site1)
-            (at rover2 site1)
-            (at rover3 site5)
-            (available rover1)
-            (available rover2)
-            (available rover3)
-            (at_lander lander1 site1)
-            (at_lander lander2 site6)
-            (empty store1)
-            (full store2)
-            (store_of store1 rover1)
-            (store_of store2 rover2)
-            (equipped_for_imaging rover3)
-            (on_board camera1 rover3)
-            (on_board camera2 rover3)
-            (on_board camera3 rover3)
-            (supports camera1 rgb)
-            (supports camera2 rgb)
-            (supports camera3 rgb)
-            (calibration_target camera1 objective1)
-            (equipped_for_soil_analysis rover1)
-            (equipped_for_soil_analysis rover2)
-            (equipped_for_soil_analysis rover3)
-            (equipped_for_rock_analysis rover1)
-            (equipped_for_rock_analysis rover2)
-            (equipped_for_rock_analysis rover3)
-            (visible_from objective1 site5)
-        )
-        (:goal
-            (and
-                (at rover1 site6)
-                (at rover2 site6)
-                (at rover3 site6)
-                (communicated_image_data objective1 rgb)
-            )
-        )
-    )"""
-
-
-@pytest.fixture
-def rover_line_missing_visible():
-    # if it's missing a visible, then rover can't reach their goal
-    return """
-    (define (problem rover)
-        (:domain rover)
-        (:objects
-            rover1 rover2 rover3 - rover
-            site1 site2 site3 site4 site5 site6 - waypoint
-        )
-        (:init
-            (can_traverse rover1 site1 site2)
-            (can_traverse rover1 site2 site3)
-            (can_traverse rover1 site3 site4)
-            (can_traverse rover1 site4 site5)
-            (can_traverse rover1 site5 site6)
-            (can_traverse rover2 site1 site2)
-            (can_traverse rover2 site2 site3)
-            (can_traverse rover2 site3 site4)
-            (can_traverse rover2 site4 site5)
-            (can_traverse rover2 site5 site6)
-            (can_traverse rover3 site1 site2)
-            (can_traverse rover3 site2 site3)
-            (can_traverse rover3 site3 site4)
-            (can_traverse rover3 site4 site5)
-            (can_traverse rover3 site5 site6)
-            (visible site1 site2)
-            (visible site2 site3)
-            (visible site3 site4)
-            (visible site5 site6)
-            (at rover1 site1)
-            (at rover2 site1)
-            (at rover3 site5)
-            (available rover1)
-            (available rover2)
-            (available rover3)
-        )
-        (:goal
-            (and
-                (at rover1 site6)
-                (at rover2 site6)
-                (at rover3 site6)
-            )
-        )
-    )"""
-
-
-@pytest.fixture
-def rover_line_1():
-    return """
-    (define (problem rover)
-        (:domain rover)
-        (:objects
-            rover1 rover2 rover3 - rover
-            site1 site2 site3 site4 site5 site6 - waypoint
-            lander1 lander2 - lander
-        )
-        (:init
-            (can_traverse rover1 site1 site2)
-            (can_traverse rover1 site2 site3)
-            (can_traverse rover1 site3 site4)
-            (can_traverse rover1 site4 site5)
-            (can_traverse rover1 site5 site6)
-            (can_traverse rover2 site1 site2)
-            (can_traverse rover2 site2 site3)
-            (can_traverse rover2 site3 site4)
-            (can_traverse rover2 site4 site5)
-            (can_traverse rover2 site5 site6)
-            (can_traverse rover3 site1 site2)
-            (can_traverse rover3 site2 site3)
-            (can_traverse rover3 site3 site4)
-            (can_traverse rover3 site4 site5)
-            (can_traverse rover3 site5 site6)
-            (visible site1 site2)
-            (visible site2 site3)
-            (visible site3 site4)
-            (visible site4 site5)
-            (visible site5 site6)
-            (at rover1 site1)
-            (at rover2 site1)
-            (at rover3 site5)
-            (available rover1)
-            (available rover2)
-            (available rover3)
-            (at_lander lander1 site1)
-            (at_lander lander2 site6)
-        )
-        (:goal
-            (and
-                (at rover1 site6)
-                (at rover2 site6)
-                (at rover3 site6)
-            )
-        )
-    )"""
-
-
-@pytest.fixture
-def rover_line_2():
-    return """
-    (define (problem rover)
-        (:domain rover)
-        (:objects
-            rover1 rover2 rover3 - rover
-            site1 site2 site3 site4 site5 site6 - waypoint
-            lander1 lander2 - lander
-        )
-        (:init
-            (can_traverse rover1 site1 site2)
-            (can_traverse rover1 site2 site3)
-            (can_traverse rover1 site3 site4)
-            (can_traverse rover1 site4 site5)
-            (can_traverse rover1 site5 site6)
-            (can_traverse rover2 site1 site2)
-            (can_traverse rover2 site2 site3)
-            (can_traverse rover2 site3 site4)
-            (can_traverse rover2 site4 site5)
-            (can_traverse rover2 site5 site6)
-            (can_traverse rover3 site1 site2)
-            (can_traverse rover3 site2 site3)
-            (can_traverse rover3 site3 site4)
-            (can_traverse rover3 site4 site5)
-            (can_traverse rover3 site5 site6)
-            (visible site1 site2)
-            (visible site2 site3)
-            (visible site3 site4)
-            (visible site5 site6)
-            (at rover1 site1)
-            (at rover2 site1)
-            (at rover3 site5)
-            (available rover1)
-            (available rover2)
-            (available rover3)
-            (at_lander lander1 site1)
-            (at_lander lander2 site6)
-        )
-        (:goal
-            (and
-                (at rover1 site6)
-                (at rover2 site6)
-                (at rover3 site6)
-            )
-        )
-    )"""
-
-
-@pytest.fixture
 def rover_single_line_fully_specified():
     return """
     (define (problem rover)
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -1576,8 +998,6 @@ def rover_single_line_fully_specified():
             (at_rover site1)
             (available)
             (at_lander site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)
@@ -1598,8 +1018,6 @@ def rover_single_line_fully_specified():
                 (visible site5 site6)
                 (available)
                 (at_lander site6)
-                (empty store1)
-                (full store2)
                 (supports camera1 rgb)
                 (supports camera2 rgb)
                 (supports camera3 rgb)
@@ -1619,7 +1037,6 @@ def rover_single_line_fully_specified_1():
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -1638,8 +1055,6 @@ def rover_single_line_fully_specified_1():
             (at_rover site1)
             (available)
             (at_lander site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)
@@ -1660,8 +1075,6 @@ def rover_single_line_fully_specified_1():
                 (visible site5 site6)
                 (available)
                 (at_lander site6)
-                (empty store1)
-                (full store2)
                 (supports camera1 rgb)
                 (supports camera2 rgb)
                 (supports camera3 rgb)
@@ -1679,7 +1092,6 @@ def rover_single_line_fully_specified_2():
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -1698,8 +1110,6 @@ def rover_single_line_fully_specified_2():
             (at_rover site6)
             (available)
             (at_lander site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)
@@ -1721,8 +1131,6 @@ def rover_single_line_fully_specified_2():
                 (available)
                 (at_rover site6)
                 (at_lander site6)
-                (empty store1)
-                (full store2)
                 (supports camera1 rgb)
                 (supports camera2 rgb)
                 (supports camera3 rgb)
@@ -1740,7 +1148,6 @@ def rover_single_line_fully_specified_3():
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -1759,8 +1166,6 @@ def rover_single_line_fully_specified_3():
             (at_rover site1)
             (available)
             (at_lander site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)
@@ -1782,8 +1187,6 @@ def rover_single_line_fully_specified_3():
                 (available)
                 (at_rover site6)
                 (at_lander site6)
-                (empty store1)
-                (full store2)
                 (supports camera1 rgb)
                 (supports camera2 rgb)
                 (supports camera3 rgb)
@@ -1804,7 +1207,6 @@ def rover_single_line_fully_specified_4():
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -1823,8 +1225,6 @@ def rover_single_line_fully_specified_4():
             (at_rover site1)
             (available)
             (at_lander site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)
@@ -1848,8 +1248,6 @@ def rover_single_line_fully_specified_4():
                 (available)
                 (at_rover site6)
                 (at_lander site6)
-                (empty store1)
-                (full store2)
                 (supports camera1 rgb)
                 (supports camera2 rgb)
                 (supports camera3 rgb)
@@ -1876,7 +1274,6 @@ def rover_single_line_fully_specified_4a():
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -1895,8 +1292,6 @@ def rover_single_line_fully_specified_4a():
             (at_rover site1)
             (available)
             (at_lander site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)
@@ -1913,6 +1308,8 @@ def rover_single_line_fully_specified_4a():
                 (communicated_rock_data site6)
                 (have_soil_analysis site6)
                 (communicated_soil_data site6)
+                (at_rock_sample site6)
+                (at_soil_sample site6)
             )
         )
     )"""
@@ -1925,7 +1322,6 @@ def rover_single_line_equiv():
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -1944,8 +1340,6 @@ def rover_single_line_equiv():
             (at_rover site1)
             (available)
             (at_lander site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)
@@ -1968,7 +1362,6 @@ def rover_single_line_equiva():
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -1987,8 +1380,6 @@ def rover_single_line_equiva():
             (at_rover site1)
             (available)
             (at_lander site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)
@@ -2027,7 +1418,6 @@ def rover_single_line_equiv_1():
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -2048,8 +1438,6 @@ def rover_single_line_equiv_1():
             (available)
             (at_lander site6)
             (at_rock_sample site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)
@@ -2093,7 +1481,6 @@ def rover_single_line_equiv_1a():
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -2114,8 +1501,6 @@ def rover_single_line_equiv_1a():
             (available)
             (at_lander site6)
             (at_rock_sample site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)
@@ -2139,7 +1524,6 @@ def rover_single_line_equiv_1b():
         (:domain rover-single)
         (:objects
             site1 site2 site3 site4 site5 site6 - waypoint
-            store1 store2 - store
             rgb - mode
             camera1 camera2 camera3 - camera
             objective1 objective2 objective3 - objective
@@ -2160,8 +1544,6 @@ def rover_single_line_equiv_1b():
             (available)
             (at_lander site6)
             (at_rock_sample site6)
-            (empty store1)
-            (full store2)
             (supports camera1 rgb)
             (supports camera2 rgb)
             (supports camera3 rgb)

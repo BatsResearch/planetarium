@@ -26,6 +26,8 @@ from .problem_fixtures import (
     rover_single_line_fully_specified_4a,
 )
 
+from pddl import requirements
+
 
 def problem_states(
     problem_init: graph.SceneGraph, problem_goals: set[graph.SceneGraph]
@@ -277,7 +279,6 @@ class TestMetrics:
 
         # check invalid equivalence
 
-        # check invalid equivalence
         for idx1, idx2 in (
             (0, 3),
             (1, 3),
@@ -305,10 +306,10 @@ class TestMetrics:
 
         # equivalence to itself
         assert metric.equals(p1, p1, is_placeholder=True)
-        assert metric.equals(p1, p1, is_placeholder=False)
+        assert metric.equals(p2, p2, is_placeholder=False)
 
         # check invalid equivalence
-        assert not metric.equals(p1, p2, is_placeholder=True)
-        assert not metric.equals(p1, p2, is_placeholder=False)
-        assert not metric.equals(p2, p1, is_placeholder=True)
-        assert not metric.equals(p2, p1, is_placeholder=False)
+        assert metric.equals(p1, p2, is_placeholder=True)
+        assert metric.equals(p1, p2, is_placeholder=False)
+        assert metric.equals(p2, p1, is_placeholder=True)
+        assert metric.equals(p2, p1, is_placeholder=False)

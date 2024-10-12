@@ -234,8 +234,8 @@ class TestRoverSingleOracle:
             with subtests.test(name):
                 problem = builder.build(desc)
                 full = oracle.fully_specify(problem)
-                assert full == problem, name
-                assert oracle.fully_specify(full) == full, name
+                assert full == problem, "fully_specify(problem) == problem"
+                assert oracle.fully_specify(full) == full, "fully_specify(fully_specify(problem)) == fully_specify(problem)"
 
     def test_inflate(
         self,

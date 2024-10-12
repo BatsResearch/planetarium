@@ -22,7 +22,7 @@ DOMAINS = dict()
 
 # load domains
 for domain in resources.files(domains).iterdir():
-  with domain.open() as f:
-    DOMAINS[os.path.basename(domain).split(".")[0]] = f.read()
+    with domain.open() as f:
+        DOMAINS[os.path.basename(domain).split(".")[0]] = f.read()
 
 from .evaluate import evaluate
