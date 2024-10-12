@@ -360,7 +360,9 @@ class TestEvaluate:
         for n1, n2 in equiv_pairs:
             test_name = f"{n2} equals {n1}"
             with subtests.test(test_name):
-                assert all(planetarium.evaluate(descs[n1], descs[n2], alias="lama-first"))
+                assert all(
+                    planetarium.evaluate(descs[n1], descs[n2], alias="lama-first")
+                )
 
 
 class TestUnsupportedDomain:

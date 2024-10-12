@@ -8,6 +8,11 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import rustworkx as rx
 
+from pddl.core import And, Problem, Domain
+from pddl.logic.predicates import Predicate
+from pddl.logic.terms import Constant
+from pddl.formatter import problem_to_string
+
 
 class Label(str, enum.Enum):
     CONSTANT = "constant"
@@ -577,4 +582,50 @@ class ProblemGraph(PlanGraph):
             goal_predicates=goal.predicates,
             domain=init.domain,
             requirements=init._requirements,
+        )
+
+    def to_pddl_str(self) -> str:
+        """
+        Convert a ProblemGraph object to a PDDL problem description string.
+
+        NOTE: REQUIREMENTS ARE NOT SUPPORTED YET.
+
+        Parameters:
+            graph (ProblemGraph): The ProblemGraph object to convert.
+
+        Returns:
+            str: A string containing the PDDL problem description.
+        """
+        constant_objs = [
+            Constant(name=n.name)
+            for n in self.nodes
+            if n.label == Label.CONSTANT
+        ]
+
+        init_predicates = []
+        goal_predicates = []
+        for n in (n for n in self.nodes if n.label == Label.PREDICATE):
+            args: list[PlanGraphNode] = [
+                v for v, _ in sorted(self.out_edges(n), key=lambda e: e[1].position)
+            ]
+            pddl_args = [
+                Constant(name=v.name)
+                for v in args
+            ]
+
+            predicate = Predicate(n.typing, *pddl_args)
+            if n.scene == Scene.INIT:
+                init_predicates.append(predicate)
+            elif n.scene == Scene.GOAL:
+                goal_predicates.append(predicate)
+
+        return problem_to_string(
+            Problem(
+                name="name",
+                domain=Domain(name=self.domain, requirements=[]),
+                objects=constant_objs,
+                init=sorted(init_predicates),
+                goal=And(*sorted(goal_predicates)),
+                requirements=[],
+            )
         )

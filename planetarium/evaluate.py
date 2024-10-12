@@ -10,6 +10,7 @@ from planetarium import builder, oracle, metric, downward, DOMAINS
 VALIDATE = os.getenv("VALIDATE", "Validate")
 DOWNWARD = os.getenv("DOWNWARD", "downward")
 
+
 def evaluate(
     source_pddl_str: str,
     target_pddl_str: str,
