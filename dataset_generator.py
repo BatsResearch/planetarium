@@ -2194,9 +2194,9 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
         elif "line" in initial_state:
             waypoint_idx = position
         elif "circle" in initial_state:
-            waypoint_idx = position % n_waypoints
+            waypoint_idx = position
         elif "star" in initial_state:
-            waypoint_idx = position if position == 0 else position - 1
+            waypoint_idx = position
         elif "partitioned" in initial_state:
             side, pos = position
             num_l = kwargs.get("partition_sizes")[0]
