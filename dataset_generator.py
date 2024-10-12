@@ -1401,7 +1401,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
                 )
 
                 return (
-                    f"You have {n_waypoints} waypoints arranged in a line."
+                    f"You have {n_waypoints} waypoints arranged in a line. "
                     + f"The {rover_string} "
                     + f"The {lander_string} "
                     + "All waypoints are visible from adjacent waypoints, and from itself. "
@@ -1439,8 +1439,8 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
                     f"You have {n_waypoints} waypoints arranged in a star shape, with a single central waypoint and the remaining waypoints forming an outer circle around the central waypoint. "
                     + f"The {rover_string} "
                     + f"The {lander_string} "
-                    + "All waypoints are visible from the central waypoint and vice versa, and all waypoints are visible from themselves."
-                    + "The rover can move freely between the central waypoint and any of the outer waypoints, but movement from the outer waypoints is only possible to the central waypoint."
+                    + "All waypoints are visible from the central waypoint and vice versa, and all waypoints are visible from themselves. "
+                    + "The rover can move freely between the central waypoint and any of the outer waypoints, but movement from the outer waypoints is only possible to the central waypoint. "
                 )
 
             case ("partitioned_navigate", True):
@@ -1508,8 +1508,8 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
                     + f"The {lander_string} "
                     + "All waypoints are visible from adjacent waypoints, and from itself. "
                     + "The rover can traverse between adjacent waypoints. "
-                    + "The rover is available and the channel is free."
-                    + f"{objective_string}"
+                    + "The rover is available and the channel is free. "
+                    + f"{objective_string} "
                     + f"{rock_string} "
                     + f"{soil_string}"
                 )
@@ -1557,7 +1557,7 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
                     + "All waypoints are visible from adjacent waypoints, and from itself. "
                     + "The rover can move between adjacent waypoints to its left or right. "
                     + "The rover is available and the channel is free. "
-                    + f"{objective_string}"
+                    + f"{objective_string} "
                     + f"{rock_string} "
                     + f"{soil_string}"
                 )
@@ -1650,8 +1650,8 @@ class RoverSingleDatasetGenerator(DatasetGenerator):
                     + f"The {rover_string} "
                     + f"{rover_equipment} "
                     + f"The {lander_string} "
-                    + "All waypoints are visible from the central waypoint and vice versa, and all waypoints are visible from themselves."
-                    + "The rover can move freely between the central waypoint and any of the outer waypoints, but movement from the outer waypoints is only possible to the central waypoint."
+                    + "All waypoints are visible from the central waypoint and vice versa, and all waypoints are visible from themselves. "
+                    + "The rover can move freely between the central waypoint and any of the outer waypoints, but movement from the outer waypoints is only possible to the central waypoint. "
                     + f"{objective_string} "
                     + f"{rock_string} "
                     + f"{soil_string}"
