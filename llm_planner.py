@@ -10,6 +10,7 @@ from transformers import (
 )
 
 from vllm import LLM, RequestOutput, SamplingParams
+from vllm.lora.request import LoRARequest
 
 
 class PlanningProblem:
@@ -193,14 +194,15 @@ class HFPlanner:
 class VLLMPlanner(Planner):
     """A class for planning using VLLM models."""
 
-    def __init__(self, model_name: str, **kwargs):
+    def __init__(self, model_name: str, lora: str | None = None, **kwargs):
         """Initializes a new VLLMPlanner.
 
         Args:
             model_name (str): The name of the model to be used.
             kwargs: Additional keyword arguments to be passed to the model.
         """
-        self.model = LLM(model_name, **kwargs)
+        self.lora = LoRARequest(lora, 1, lora) if lora else None
+        self.model = LLM(model_name, enable_lora=bool(lora), **kwargs)
         self.tokenizer = self.model.get_tokenizer()
 
     def plan_chat(
@@ -236,6 +238,7 @@ class VLLMPlanner(Planner):
             encoded,
             params,
             use_tqdm=False,
+            lora_request=self.lora,
         )
 
         return [output.outputs[0].text for output in outputs]
@@ -254,6 +257,7 @@ class OpenAIPlanner:
         """
         self.client = OpenAI(**kwargs)
         self.model_name = model_name
+        self.is_o1 = model_name.startswith("o1")
 
     def _plan_chat(
         self,
@@ -273,20 +277,36 @@ class OpenAIPlanner:
             str: The message completion.
         """
 
-        return (
-            self.client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                frequency_penalty=kwargs.get("frequency_penalty", None),
-                max_tokens=max_new_tokens,
-                n=1,
-                presence_penalty=kwargs.get("presence_penalty", None),
-                temperature=kwargs.get("temperature", 0.0),
-                top_p=kwargs.get("top_p", None),
+        if self.is_o1:
+            return (
+                self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    frequency_penalty=kwargs.get("frequency_penalty", None),
+                    max_completion_tokens=max_new_tokens,
+                    n=1,
+                    presence_penalty=kwargs.get("presence_penalty", None),
+                    temperature=kwargs.get("temperature", 0.0),
+                    top_p=kwargs.get("top_p", None),
+                )
+                .choices[0]
+                .message.content
             )
-            .choices[0]
-            .message.content
-        )
+        else:
+            return (
+                self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    frequency_penalty=kwargs.get("frequency_penalty", None),
+                    max_tokens=max_new_tokens,
+                    n=1,
+                    presence_penalty=kwargs.get("presence_penalty", None),
+                    temperature=kwargs.get("temperature", 0.0),
+                    top_p=kwargs.get("top_p", None),
+                )
+                .choices[0]
+                .message.content
+            )
 
     def plan_chat(
         self,

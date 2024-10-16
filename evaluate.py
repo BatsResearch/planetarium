@@ -22,7 +22,7 @@ import llm_planner as llmp
 
 HF_USER_TOKEN = os.getenv("HF_USER_TOKEN")
 VALIDATE = os.getenv("VALIDATE", "Validate")
-
+DOWNWARD = os.getenv("DOWNWARD", "downward")
 
 def signal_handler(signum, frame):
     raise TimeoutError("Timed out")
@@ -140,6 +140,7 @@ def load_planner(config: Mapping[str, dict[str, str]]) -> llmp.Planner:
     elif config["model"]["type"] == "hf":
         llm = llmp.VLLMPlanner(
             config["model"]["model_name"],
+            lora=config["model"].get("lora"),
             tokenizer=config["model"]["tokenizer_name"],
             trust_remote_code=True,
             dtype=torch.bfloat16,
@@ -274,6 +275,8 @@ def clean(pddl_str: str) -> str:
 def validate(
     pddl_str: str,
     domain_str: str,
+    fast_downward: str = DOWNWARD,
+    **downward_args,
 ) -> bool:
     """Validate a PDDL problem as "solvable".
 
@@ -292,6 +295,17 @@ def validate(
         valid = downward.validate(domain_str, pddl_str, plan, VALIDATE)
     except (LarkError, AttributeError, ValueError):
         pass
+    except (oracle.DomainNotSupportedError, NotImplementedError):
+        try:
+            plan_str, _ = downward.plan(
+                domain_str,
+                pddl_str,
+                downward=fast_downward,
+                **downward_args,
+            )
+            valid = downward.validate(domain_str, pddl_str, plan_str, VALIDATE)
+        except:
+            pass
 
     return valid
 
@@ -325,7 +339,11 @@ def equivalence(
 
     return (
         parseable,
-        validate(llm_problem_pddl, domains[graphs["llm_problem_graph"].domain]),
+        validate(
+            llm_problem_pddl,
+            domains[graphs["llm_problem_graph"].domain],
+            alias="lama-first",
+        ),
         full_equivalence(
             graphs["problem_graph"],
             graphs["llm_problem_graph"],
@@ -465,7 +483,7 @@ def generate_openai(
                             problem_id,
                             config_str,
                             model_name,
-                            llm_problem_pddl,
+                            llm_problem_pddl[0],
                         ),
                     )
                     pbar.update()
@@ -574,7 +592,7 @@ def _evaluate(args):
             return problem_id, config_str, model_name, (None, None, None)
         except Exception as e:
             equivalent = None
-            raise e
+            print("ERROR", e, problem_id, llm_problem_pddl)
         cursor.close()
     return problem_id, config_str, model_name, (parseable, valid, equivalent)
 
