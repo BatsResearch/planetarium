@@ -52,25 +52,25 @@
   ; Robot movements
   (:action up
     :parameters (?r - robot ?x - tile ?y - tile)
-    :precondition (and (robot-at ?r ?x) (up ?x ?y))
+    :precondition (and (robot-at ?r ?x) (up ?y ?x))
     :effect (and (robot-at ?r ?y) (not (robot-at ?r ?x)))
   )
 
   (:action down
     :parameters (?r - robot ?x - tile ?y - tile)
-    :precondition (and (robot-at ?r ?x) (up ?y ?x))
+    :precondition (and (robot-at ?r ?x) (up ?x ?y))
     :effect (and (robot-at ?r ?y) (not (robot-at ?r ?x)))
   )
 
   (:action right
     :parameters (?r - robot ?x - tile ?y - tile)
-    :precondition (and (robot-at ?r ?x) (right ?x ?y))
+    :precondition (and (robot-at ?r ?x) (right ?y ?x))
     :effect (and (robot-at ?r ?y) (not (robot-at ?r ?x)))
   )
 
   (:action left
     :parameters (?r - robot ?x - tile ?y - tile)
-    :precondition (and (robot-at ?r ?x) (right ?y ?x))
+    :precondition (and (robot-at ?r ?x) (right ?x ?y))
     :effect (and (robot-at ?r ?y) (not (robot-at ?r ?x)))
   )
 
